@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nationals Heat Search</title>
+    <!-- Load PapaParse for instant client-side CSV processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f4f4f9; padding: 20px; max-width: 600px; margin: 0 auto; color: #333; }
+        .branding { text-align: center; margin-bottom: 20px; }
+        .upload-section { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
+        input[type="file"] { margin-bottom: 10px; }
+        input[type="text"] { width: 100%; padding: 15px; font-size: 18px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; border-left: 5px solid #ff6b6b; }
+        .heat-number { font-size: 20px; font-weight: bold; color: #ff6b6b; margin-bottom: 5px; }
+        .event-details { color: #555; line-height: 1.5; font-size: 16px; }
+        .station { display: inline-block; background: #1a2b4c; color: white; padding: 4px 10px; border-radius: 4px; font-size: 14px; margin-top: 10px; font-weight: bold; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="branding">
+        <h2>Nationals Athlete Search</h2>
+    </div>
+
+    <div class="upload-section" id="uploadSection">
+        <label for="csvFile"><strong>Upload Heat Sheet (CSV)</strong></label><br><br>
+        <input type="file" id="csvFile" accept=".csv">
+        <p style="font-size: 12px; color: #666;">Data is processed locally in your browser.</p>
+    </div>
+
+    <div id="searchSection" class="hidden">
+        <input type="text" id="searchBox" placeholder="Search athlete name..." onkeyup="searchAthlete()">
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let heatData = [];
+
+        // Listen for file upload
+        document.getElementById('csvFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                complete: function(results) {
+                    heatData = results.data;
+                    document.getElementById('uploadSection').classList.add('hidden');
+                    document.getElementById('searchSection').classList.remove('hidden');
+                    document.getElementById('searchBox').focus();
+                }
+            });
+        });
+
+        function searchAthlete() {
+            const query = document.getElementById("searchBox").value.toLowerCase();
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = "";
+
+            if (query.length < 2) return;
+
+            let matches = [];
+
+            // Scan every row and cell for the athlete's name
+            heatData.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    if (cell && cell.toLowerCase().includes(query)) {
+                        
+                        // Look backwards in the row to find the Event Name/Division (usually above the athlete name in these grids)
+                        let eventDetails = "Event details parsing based on CSV structure";
+                        if (rowIndex > 0 && heatData[rowIndex - 1][colIndex]) {
+                            eventDetails = heatData[rowIndex - 1][colIndex]; 
+                        }
+
+                        // Grab the Heat Number (assuming it's in the first column of the row)
+                        let heatNumber = row[0] || "Unknown";
+                        if (!heatNumber.toLowerCase().includes('heat') && rowIndex > 0) {
+                             heatNumber = heatData[rowIndex][0];
+                        }
+
+                        matches.push({
+                            name: cell.trim(),
+                            heat: heatNumber,
+                            station: colIndex, 
+                            event: eventDetails
+                        });
+                    }
+                });
+            });
+
+            if (matches.length === 0) {
+                resultsDiv.innerHTML = "<p>No matches found.</p>";
+                return;
+            }
+
+            matches.forEach(match => {
+                resultsDiv.innerHTML += `
+                    <div class="card">
+                        <div class="heat-number">Heat ${match.heat}</div>
+                        <div class="event-details">
+                            <strong>${match.name}</strong><br>
+                            ${match.event}
+                        </div>
+                        <div class="station">Station ${match.station}</div>
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
