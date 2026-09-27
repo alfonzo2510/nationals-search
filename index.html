@@ -121,9 +121,9 @@
     <p>Search athletes across all heats & divisions</p>
   </header>
 
-  <div class="panel" id="uploadPanel">
+  <div class="panel hidden" id="uploadPanel">
     <div class="file-drop">
-      <strong>Upload Heats File (.CSV)</strong>
+      <strong id="uploadMessage">Upload Heats File (.CSV)</strong>
       <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Convert the PDF to CSV and select it here.</p>
       <input type="file" id="csvFileInput" accept=".csv" />
     </div>
@@ -146,6 +146,23 @@
   <script>
     let parsedSheet = [];
 
+    // Attempt to load 'heats.csv' automatically
+    window.onload = function() {
+      Papa.parse("heats.csv", {
+        download: true,
+        complete: function(parsed) {
+          parsedSheet = parsed.data;
+          document.getElementById('searchSection').classList.remove('hidden');
+        },
+        error: function() {
+          // If auto-load fails, show manual upload as a fallback
+          document.getElementById('uploadPanel').classList.remove('hidden');
+          document.getElementById('uploadMessage').innerHTML = "<span style='color:red;'>heats.csv not found in repository.</span><br>Upload it manually below:";
+        }
+      });
+    };
+
+    // Manual fallback listener
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
       if (!targetFile) return;
@@ -237,13 +254,12 @@
           if (text.toLowerCase().includes(term)) {
             if (!text.match(/^(SR|DD|WH|IR|Station|Heat|#)/i)) {
               
-              // Get schedule info based on currentHeat
               const schedule = getScheduleDetails(currentHeat);
 
               matches.push({
                 name: text,
                 heat: currentHeat,
-                station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
+                station: cIdx > 0 ? \`Station \${cIdx}\` : 'Station 1',
                 division: lastKnownEvents[cIdx] || "Division parsing error",
                 day: schedule.day,
                 time: schedule.time
@@ -254,7 +270,7 @@
       });
 
       const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
-      tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
+      tally.innerHTML = \`<span class="tally-badge">Total Events Found: \${uniqueMatches.length}</span>\`;
 
       if (uniqueMatches.length === 0) {
         feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">No entries matching that name.</p>';
@@ -262,16 +278,16 @@
       }
 
       uniqueMatches.forEach(item => {
-        feed.innerHTML += `
+        feed.innerHTML += \`
           <div class="card">
             <div class="card-top">
-              <span class="schedule-time">${item.day} @ ${item.time}</span>
-              <span class="heat-badge">Heat ${item.heat} | ${item.station}</span>
+              <span class="schedule-time">\${item.day} @ \${item.time}</span>
+              <span class="heat-badge">Heat \${item.heat} | \${item.station}</span>
             </div>
-            <div class="athlete-name">${item.name}</div>
-            <div class="event-info">${item.division}</div>
+            <div class="athlete-name">\${item.name}</div>
+            <div class="event-info">\${item.division}</div>
           </div>
-        `;
+        \`;
       });
     }
   </script>
