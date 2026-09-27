@@ -17,7 +17,7 @@
     }
     header {
       text-align: center;
-      padding: 24px 0 20px;
+      padding: 24px 16px 20px;
       background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
       color: white;
       border-radius: 12px;
@@ -34,6 +34,22 @@
       color: #93c5fd;
       margin-top: 6px;
       font-weight: 500;
+      margin-bottom: 16px;
+    }
+    .header-btn {
+      display: inline-block;
+      background: #f97316;
+      color: white;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);
+      transition: opacity 0.2s;
+    }
+    .header-btn:active {
+      opacity: 0.8;
     }
     .panel {
       background: #ffffff;
@@ -126,7 +142,17 @@
       font-size: 1.2rem;
       font-weight: 800;
       color: #0f172a;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+    }
+    .club-tag {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #1d4ed8;
+      background: #dbeafe;
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin-bottom: 8px;
     }
     .event-info {
       font-size: 0.95rem;
@@ -136,7 +162,6 @@
       display: inline-block;
       padding: 4px 8px;
       border-radius: 6px;
-      margin-top: 6px;
     }
     .hidden { display: none; }
   </style>
@@ -146,6 +171,7 @@
   <header>
     <h1>2026 Nationals Lookup</h1>
     <p>Search athletes across all heats & divisions</p>
+    <a href="https://www.revolutionise.com.au/skippingaustralia/" target="_blank" class="header-btn">View Official Program</a>
   </header>
 
   <div class="panel hidden" id="uploadPanel">
@@ -173,7 +199,6 @@
   <script>
     let parsedSheet = [];
 
-    // Attempt to load 'heats.csv' automatically
     window.onload = function() {
       Papa.parse("heats.csv", {
         download: true,
@@ -188,7 +213,6 @@
       });
     };
 
-    // Manual fallback listener
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
       if (!targetFile) return;
@@ -203,7 +227,6 @@
       });
     });
 
-    // Cross-reference the heat number with the official event program blocks
     function getScheduleDetails(heatNum) {
       const h = parseInt(heatNum);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
@@ -287,6 +310,15 @@
                 let displayHeat = currentHeat;
                 let displayDiv = lastKnownEvents[cIdx] || "Division parsing error";
                 let displayName = chunkText;
+                let displayClub = "";
+
+                // Attempt to grab club name from the cell immediately above the name in clean grids
+                if (rIdx > 0 && parsedSheet[rIdx - 1]) {
+                  let aboveText = (parsedSheet[rIdx - 1][cIdx] || "").trim();
+                  if (aboveText && !aboveText.match(/^(SR|DD|WH|IR|Team|DDC|SCT|Heat|Station)/i)) {
+                    displayClub = aboveText;
+                  }
+                }
 
                 let embeddedHeatMatch = chunkText.match(/^(\d{1,3})\s+#\d{1,4}/);
                 if (embeddedHeatMatch) {
@@ -298,6 +330,7 @@
                        displayDiv = divMatch[0].trim();
                        displayName = displayName.replace(divMatch[0], '').trim();
                    }
+                   displayClub = ""; // Clear club guess for smashed cells to keep it clean
                 }
 
                 if (displayName.length > 45) {
@@ -314,6 +347,7 @@
                   heat: displayHeat,
                   station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
                   division: displayDiv,
+                  club: displayClub,
                   day: schedule.day,
                   time: schedule.time,
                   block: schedule.block,
@@ -334,6 +368,7 @@
       }
 
       uniqueMatches.forEach(item => {
+        let clubHtml = item.club ? `<div class="club-tag">${item.club}</div><br>` : '';
         feed.innerHTML += `
           <div class="card">
             <div class="card-header">
@@ -347,6 +382,7 @@
             </div>
             <div class="card-body">
               <div class="athlete-name">${item.name}</div>
+              ${clubHtml}
               <div class="event-info">${item.division}</div>
             </div>
           </div>
