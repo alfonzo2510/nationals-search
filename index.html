@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nationals Heat & Schedule Search</title>
+  <!-- Load PapaParse for instant client-side CSV processing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -170,49 +171,59 @@
       if (term.length < 2) return;
 
       const matches = [];
+      
+      // Track variables as the script scans downwards
+      let currentHeat = "Unknown";
+      let lastKnownEvents = {}; 
 
-      parsedSheet.forEach((row, rIdx) => {
+      parsedSheet.forEach((row) => {
+        // Track the Heat Number (Found in Column 0)
+        let firstCol = (row[0] || "").trim();
+        if (firstCol && !isNaN(firstCol)) {
+          currentHeat = firstCol;
+        } else if (firstCol.toLowerCase().includes("heat") && firstCol.length < 10) {
+          currentHeat = firstCol.replace(/[^0-9]/g, '');
+        }
+
         row.forEach((cellText, cIdx) => {
-          if (cellText && cellText.toLowerCase().includes(term)) {
-            // Find closest heat identifier in this row or earlier rows
-            let heatTag = row[0] || '';
-            if (!heatTag.toLowerCase().includes('heat')) {
-              for (let i = rIdx; i >= 0; i--) {
-                if (parsedSheet[i][0] && parsedSheet[i][0].toLowerCase().includes('heat')) {
-                  heatTag = parsedSheet[i][0];
-                  break;
-                }
-              }
-            }
+          let text = (cellText || "").trim();
+          if (!text) return;
 
-            // Identify event division above the competitor cell
-            let division = '';
-            if (rIdx > 0 && parsedSheet[rIdx - 1][cIdx]) {
-              division = parsedSheet[rIdx - 1][cIdx];
-            }
+          // Track the Event Division per column (e.g., SRSE, DDSS, SRIF, WHPF)
+          if (text.match(/^(SR|DD|WH|IR|Team|DDC)/i)) {
+            lastKnownEvents[cIdx] = text;
+          }
 
-            matches.push({
-              name: cellText.trim(),
-              heat: heatTag || `Row ${rIdx + 1}`,
-              station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
-              division: division
-            });
+          // Check for athlete name match
+          if (text.toLowerCase().includes(term)) {
+            // Exclude matches that are actually just event codes, IDs, or headers
+            if (!text.match(/^(SR|DD|WH|IR|Station|Heat|#)/i)) {
+              matches.push({
+                name: text,
+                heat: currentHeat,
+                station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
+                division: lastKnownEvents[cIdx] || "Division parsing error"
+              });
+            }
           }
         });
       });
 
-      tally.innerHTML = `<span class="tally-badge">Total Events Found: ${matches.length}</span>`;
+      // Filter out duplicates in case the CSV split a name across two identical rows
+      const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
 
-      if (matches.length === 0) {
+      tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
+
+      if (uniqueMatches.length === 0) {
         feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">No entries matching that name.</p>';
         return;
       }
 
-      matches.forEach(item => {
+      uniqueMatches.forEach(item => {
         feed.innerHTML += `
           <div class="card">
             <div class="card-top">
-              <span class="heat-title">${item.heat}</span>
+              <span class="heat-title">Heat ${item.heat}</span>
               <span class="station-badge">${item.station}</span>
             </div>
             <div class="athlete-name">${item.name}</div>
