@@ -251,24 +251,60 @@
             lastKnownEvents[cIdx] = text;
           }
 
-          if (text.toLowerCase().includes(term)) {
-            if (!text.match(/^(SR|DD|WH|IR|Station|Heat|#)/i)) {
-              
-              const schedule = getScheduleDetails(currentHeat);
+          // Un-smash corrupted CSV cells where the converter merged multiple heats
+          // Looks for pattern like "42 #945" to split the text block apart safely
+          let chunks = text.split(/(?=\b\d{1,3}\s+#\d{1,4}\b)/);
 
-              matches.push({
-                name: text,
-                heat: currentHeat,
-                station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
-                division: lastKnownEvents[cIdx] || "Division parsing error",
-                day: schedule.day,
-                time: schedule.time
-              });
+          chunks.forEach(chunk => {
+            let chunkText = chunk.trim();
+            if (chunkText.toLowerCase().includes(term)) {
+              if (!chunkText.match(/^(SR|DD|WH|IR|Station|Heat|#)$/i)) {
+                
+                let displayHeat = currentHeat;
+                let displayDiv = lastKnownEvents[cIdx] || "Division parsing error";
+                let displayName = chunkText;
+
+                // Extract exact heat number if embedded (e.g., "42 #945")
+                let embeddedHeatMatch = chunkText.match(/^(\d{1,3})\s+#\d{1,4}/);
+                if (embeddedHeatMatch) {
+                   displayHeat = embeddedHeatMatch[1];
+                   
+                   // Clean the ID out of the name string
+                   displayName = chunkText.replace(/^\d{1,3}\s+#\d{1,4}\s+/, '');
+                   
+                   // Attempt to safely extract the event division (e.g., "DDSF F 1 2-1 5")
+                   let divMatch = displayName.match(/^(SR|DD|WH|IR|Team|DDC|SCT)[A-Za-z0-9\-\s\+]{2,15}/i);
+                   if (divMatch) {
+                       displayDiv = divMatch[0].trim();
+                       displayName = displayName.replace(divMatch[0], '').trim();
+                   }
+                }
+
+                // Clean up massive strings for the UI
+                if (displayName.length > 45) {
+                    let matchIdx = displayName.toLowerCase().indexOf(term);
+                    let start = Math.max(0, matchIdx - 15);
+                    let end = Math.min(displayName.length, matchIdx + term.length + 15);
+                    displayName = (start > 0 ? "..." : "") + displayName.substring(start, end).trim() + (end < displayName.length ? "..." : "");
+                }
+
+                const schedule = getScheduleDetails(displayHeat);
+
+                matches.push({
+                  name: displayName,
+                  heat: displayHeat,
+                  station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
+                  division: displayDiv,
+                  day: schedule.day,
+                  time: schedule.time
+                });
+              }
             }
-          }
+          });
         });
       });
 
+      // Filter out duplicates in case the CSV split a name across two identical rows
       const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
       tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
 
