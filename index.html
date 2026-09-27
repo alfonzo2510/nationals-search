@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nationals Heat & Schedule Search</title>
-  <!-- Load PapaParse for instant client-side CSV processing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -75,9 +74,9 @@
     .card {
       background: #ffffff;
       border-radius: 10px;
-      padding: 14px 16px;
+      padding: 16px;
       margin-top: 10px;
-      border-left: 4px solid #f97316;
+      border-left: 5px solid #f97316;
       box-shadow: 0 2px 6px rgba(0,0,0,0.04);
       border-top: 1px solid #f1f5f9;
       border-right: 1px solid #f1f5f9;
@@ -87,30 +86,30 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-    .heat-title {
-      font-size: 1.1rem;
-      font-weight: 700;
+    .schedule-time {
+      font-size: 1.15rem;
+      font-weight: 800;
       color: #f97316;
     }
-    .station-badge {
-      font-size: 0.8rem;
+    .heat-badge {
+      font-size: 0.85rem;
       font-weight: 700;
       background: #0f172a;
       color: #ffffff;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 6px;
     }
     .athlete-name {
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       color: #0f172a;
     }
     .event-info {
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       color: #475569;
-      margin-top: 3px;
+      margin-top: 4px;
     }
     .hidden { display: none; }
   </style>
@@ -161,6 +160,51 @@
       });
     });
 
+    // Cross-reference the heat number with the event schedule
+    function getScheduleDetails(heatNum) {
+      const h = parseInt(heatNum);
+      if (isNaN(h)) return { day: "TBD", time: "Time TBD" };
+
+      // Sunday 27.09
+      if (h >= 1 && h <= 67) {
+        if (h <= 28) return { day: "Sunday", time: "09:45" };
+        if (h <= 53) return { day: "Sunday", time: "11:50" };
+        return { day: "Sunday", time: "14:05" };
+      }
+      // Monday 28.09
+      if (h >= 70 && h <= 214) {
+        if (h <= 99) return { day: "Monday", time: "08:00" };
+        if (h <= 112) return { day: "Monday", time: "08:45" };
+        if (h <= 121) return { day: "Monday", time: "09:20" };
+        if (h <= 139) return { day: "Monday", time: "10:50" };
+        if (h <= 189) return { day: "Monday", time: "11:40" };
+        return { day: "Monday", time: "15:10" };
+      }
+      // Tuesday 29.09
+      if (h >= 216 && h <= 331) {
+        if (h <= 228) return { day: "Tuesday", time: "08:30" };
+        if (h <= 236) return { day: "Tuesday", time: "09:10" };
+        if (h <= 240) return { day: "Tuesday", time: "09:35" };
+        if (h <= 267) return { day: "Tuesday", time: "10:40" };
+        if (h <= 284) return { day: "Tuesday", time: "12:15" };
+        return { day: "Tuesday", time: "13:35" };
+      }
+      // Wednesday 30.09
+      if (h >= 333 && h <= 382) {
+        if (h <= 336) return { day: "Wednesday", time: "09:00" };
+        if (h <= 350) return { day: "Wednesday", time: "09:30" };
+        if (h <= 368) return { day: "Wednesday", time: "10:10" };
+        if (h <= 379) return { day: "Wednesday", time: "12:30" };
+        return { day: "Wednesday", time: "14:20" };
+      }
+      // Thursday 01.10
+      if (h >= 1000) {
+        return { day: "Thursday", time: "09:00" };
+      }
+
+      return { day: "TBD", time: "Time TBD" };
+    }
+
     function executeSearch() {
       const term = document.getElementById('nameQuery').value.trim().toLowerCase();
       const feed = document.getElementById('resultsFeed');
@@ -171,13 +215,10 @@
       if (term.length < 2) return;
 
       const matches = [];
-      
-      // Track variables as the script scans downwards
       let currentHeat = "Unknown";
       let lastKnownEvents = {}; 
 
-      parsedSheet.forEach((row) => {
-        // Track the Heat Number (Found in Column 0)
+      parsedSheet.forEach((row, rIdx) => {
         let firstCol = (row[0] || "").trim();
         if (firstCol && !isNaN(firstCol)) {
           currentHeat = firstCol;
@@ -189,29 +230,30 @@
           let text = (cellText || "").trim();
           if (!text) return;
 
-          // Track the Event Division per column (e.g., SRSE, DDSS, SRIF, WHPF)
-          if (text.match(/^(SR|DD|WH|IR|Team|DDC)/i)) {
+          if (text.match(/^(SR|DD|WH|IR|Team|DDC|SCT)/i)) {
             lastKnownEvents[cIdx] = text;
           }
 
-          // Check for athlete name match
           if (text.toLowerCase().includes(term)) {
-            // Exclude matches that are actually just event codes, IDs, or headers
             if (!text.match(/^(SR|DD|WH|IR|Station|Heat|#)/i)) {
+              
+              // Get schedule info based on currentHeat
+              const schedule = getScheduleDetails(currentHeat);
+
               matches.push({
                 name: text,
                 heat: currentHeat,
                 station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
-                division: lastKnownEvents[cIdx] || "Division parsing error"
+                division: lastKnownEvents[cIdx] || "Division parsing error",
+                day: schedule.day,
+                time: schedule.time
               });
             }
           }
         });
       });
 
-      // Filter out duplicates in case the CSV split a name across two identical rows
       const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
-
       tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
 
       if (uniqueMatches.length === 0) {
@@ -223,8 +265,8 @@
         feed.innerHTML += `
           <div class="card">
             <div class="card-top">
-              <span class="heat-title">Heat ${item.heat}</span>
-              <span class="station-badge">${item.station}</span>
+              <span class="schedule-time">${item.day} @ ${item.time}</span>
+              <span class="heat-badge">Heat ${item.heat} | ${item.station}</span>
             </div>
             <div class="athlete-name">${item.name}</div>
             <div class="event-info">${item.division}</div>
