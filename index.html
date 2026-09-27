@@ -9,7 +9,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f1f5f9;
+      background: #f0f4f8;
       color: #0f172a;
       padding: 16px;
       max-width: 650px;
@@ -17,17 +17,23 @@
     }
     header {
       text-align: center;
-      padding: 16px 0 20px;
+      padding: 24px 0 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: white;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
     }
     header h1 {
-      font-size: 1.4rem;
-      color: #0f172a;
+      font-size: 1.6rem;
       font-weight: 800;
+      letter-spacing: 0.5px;
     }
     header p {
-      font-size: 0.9rem;
-      color: #64748b;
-      margin-top: 4px;
+      font-size: 0.95rem;
+      color: #93c5fd;
+      margin-top: 6px;
+      font-weight: 500;
     }
     .panel {
       background: #ffffff;
@@ -51,65 +57,86 @@
     }
     .search-input {
       width: 100%;
-      padding: 14px 16px;
-      font-size: 1.05rem;
+      padding: 16px;
+      font-size: 1.1rem;
       border-radius: 8px;
-      border: 1.5px solid #cbd5e1;
+      border: 2px solid #e2e8f0;
       outline: none;
-      transition: border-color 0.2s;
+      transition: all 0.2s;
+      background: #f8fafc;
     }
     .search-input:focus {
-      border-color: #2563eb;
+      border-color: #f97316;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
     }
     .tally-badge {
       display: inline-block;
-      margin-top: 10px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #1e40af;
-      background: #dbeafe;
-      padding: 4px 10px;
+      margin-top: 12px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #0f766e;
+      background: #ccfbf1;
+      padding: 6px 12px;
       border-radius: 999px;
     }
     .card {
       background: #ffffff;
-      border-radius: 10px;
-      padding: 16px;
-      margin-top: 10px;
-      border-left: 5px solid #f97316;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-      border-top: 1px solid #f1f5f9;
-      border-right: 1px solid #f1f5f9;
-      border-bottom: 1px solid #f1f5f9;
+      border-radius: 12px;
+      padding: 0;
+      margin-top: 16px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
     }
-    .card-top {
+    .card-header {
+      background: #0f172a;
+      padding: 12px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
+      border-bottom: 3px solid #f97316;
     }
-    .schedule-time {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #f97316;
-    }
-    .heat-badge {
+    .block-info {
+      color: white;
       font-size: 0.85rem;
-      font-weight: 700;
-      background: #0f172a;
-      color: #ffffff;
-      padding: 4px 10px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .block-time {
+      font-size: 1.1rem;
+      color: #fbd38d;
+      font-weight: 800;
+    }
+    .heat-station-badge {
+      background: #f97316;
+      color: white;
+      font-size: 0.95rem;
+      font-weight: 800;
+      padding: 6px 10px;
       border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);
+    }
+    .card-body {
+      padding: 16px;
     }
     .athlete-name {
-      font-size: 1.05rem;
-      font-weight: 700;
+      font-size: 1.2rem;
+      font-weight: 800;
       color: #0f172a;
+      margin-bottom: 4px;
     }
     .event-info {
       font-size: 0.95rem;
-      color: #475569;
-      margin-top: 4px;
+      color: #334155;
+      font-weight: 500;
+      background: #f1f5f9;
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin-top: 6px;
     }
     .hidden { display: none; }
   </style>
@@ -123,14 +150,14 @@
 
   <div class="panel hidden" id="uploadPanel">
     <div class="file-drop">
-      <strong id="uploadMessage">Upload Heats File (.CSV)</strong>
-      <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Convert the PDF to CSV and select it here.</p>
+      <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
+      <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Convert the PDF to CSV and select it here.</p>
       <input type="file" id="csvFileInput" accept=".csv" />
     </div>
   </div>
 
   <div id="searchSection" class="hidden">
-    <div class="panel">
+    <div class="panel" style="padding: 16px;">
       <input
         type="search"
         id="nameQuery"
@@ -155,9 +182,8 @@
           document.getElementById('searchSection').classList.remove('hidden');
         },
         error: function() {
-          // If auto-load fails, show manual upload as a fallback
           document.getElementById('uploadPanel').classList.remove('hidden');
-          document.getElementById('uploadMessage').innerHTML = "<span style='color:red;'>heats.csv not found in repository.</span><br>Upload it manually below:";
+          document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv not found in repository.</span><br>Upload it manually below:";
         }
       });
     };
@@ -177,49 +203,49 @@
       });
     });
 
-    // Cross-reference the heat number with the event schedule
+    // Cross-reference the heat number with the official event program blocks
     function getScheduleDetails(heatNum) {
       const h = parseInt(heatNum);
-      if (isNaN(h)) return { day: "TBD", time: "Time TBD" };
+      if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
 
       // Sunday 27.09
       if (h >= 1 && h <= 67) {
-        if (h <= 28) return { day: "Sunday", time: "09:45" };
-        if (h <= 53) return { day: "Sunday", time: "11:50" };
-        return { day: "Sunday", time: "14:05" };
+        if (h <= 28) return { day: "Sunday", time: "09:45 - 11:20", block: "Heats 1-28", blockName: "SRSE (11+), SRSS (7U-10)" };
+        if (h <= 53) return { day: "Sunday", time: "11:50 - 13:20", block: "Heats 31-53", blockName: "DDSF (All Ages)" };
+        return { day: "Sunday", time: "14:05 - 14:45", block: "Heats 56-67", blockName: "Individual Freestyle (7U/8)" };
       }
       // Monday 28.09
       if (h >= 70 && h <= 214) {
-        if (h <= 99) return { day: "Monday", time: "08:00" };
-        if (h <= 112) return { day: "Monday", time: "08:45" };
-        if (h <= 121) return { day: "Monday", time: "09:20" };
-        if (h <= 139) return { day: "Monday", time: "10:50" };
-        if (h <= 189) return { day: "Monday", time: "11:40" };
-        return { day: "Monday", time: "15:10" };
+        if (h <= 99) return { day: "Monday", time: "08:00 - 08:45", block: "Heats 70-99", blockName: "SRSS (11+), SRSE 1MIN (7U-10)" };
+        if (h <= 112) return { day: "Monday", time: "08:45 - 09:10", block: "Heats 104-112", blockName: "SRSR (All Ages)" };
+        if (h <= 121) return { day: "Monday", time: "09:20 - 09:40", block: "Heats 115-121", blockName: "DDSS (12+)" };
+        if (h <= 139) return { day: "Monday", time: "10:50 - 11:15", block: "Heats 126-139", blockName: "SRPF (8U/9-10) SRTF (30+)" };
+        if (h <= 189) return { day: "Monday", time: "11:40 - 15:00", block: "Heats 141-189", blockName: "SRIF (11-29F)" };
+        return { day: "Monday", time: "15:10 - 16:40", block: "Heats 191-214", blockName: "SRTF (9-10/11-12/12-15/16+)" };
       }
       // Tuesday 29.09
       if (h >= 216 && h <= 331) {
-        if (h <= 228) return { day: "Tuesday", time: "08:30" };
-        if (h <= 236) return { day: "Tuesday", time: "09:10" };
-        if (h <= 240) return { day: "Tuesday", time: "09:35" };
-        if (h <= 267) return { day: "Tuesday", time: "10:40" };
-        if (h <= 284) return { day: "Tuesday", time: "12:15" };
-        return { day: "Tuesday", time: "13:35" };
+        if (h <= 228) return { day: "Tuesday", time: "08:30 - 09:00", block: "Heats 216-228", blockName: "SRDR (All Ages)" };
+        if (h <= 236) return { day: "Tuesday", time: "09:10 - 09:25", block: "Heats 230-236", blockName: "DDSR (11+), DDCS (12-15, 16+)" };
+        if (h <= 240) return { day: "Tuesday", time: "09:35 - 09:40", block: "Heats 239-240", blockName: "DDSR 2X30 (8U, 9-10)" };
+        if (h <= 267) return { day: "Tuesday", time: "10:40 - 12:05", block: "Heats 243-267", blockName: "SRIF (9/10/30+)" };
+        if (h <= 284) return { day: "Tuesday", time: "12:15 - 13:20", block: "Heats 269-284", blockName: "SRIF (11+M)" };
+        return { day: "Tuesday", time: "13:35 - 16:20", block: "Heats 286-331", blockName: "SRPF (11+)" };
       }
       // Wednesday 30.09
       if (h >= 333 && h <= 382) {
-        if (h <= 336) return { day: "Wednesday", time: "09:00" };
-        if (h <= 350) return { day: "Wednesday", time: "09:30" };
-        if (h <= 368) return { day: "Wednesday", time: "10:10" };
-        if (h <= 379) return { day: "Wednesday", time: "12:30" };
-        return { day: "Wednesday", time: "14:20" };
+        if (h <= 336) return { day: "Wednesday", time: "09:00 - 09:20", block: "Heats 333-336", blockName: "SRTU (11-14/15+)" };
+        if (h <= 350) return { day: "Wednesday", time: "09:30 - 10:10", block: "Heats 339-350", blockName: "DDPF (12-15/16+)" };
+        if (h <= 368) return { day: "Wednesday", time: "10:10 - 11:00", block: "Heats 352-368", blockName: "WHPF (12-15/16-18/19+), SRPF (30+)" };
+        if (h <= 379) return { day: "Wednesday", time: "12:30 - 13:40", block: "Heats 374-379", blockName: "Team Show" };
+        return { day: "Wednesday", time: "14:20 - 14:40", block: "Heats 380-382", blockName: "DDC Performance" };
       }
       // Thursday 01.10
       if (h >= 1000) {
-        return { day: "Thursday", time: "09:00" };
+        return { day: "Thursday", time: "09:00 - 14:30", block: "Grand Champs", blockName: "Overall Championships" };
       }
 
-      return { day: "TBD", time: "Time TBD" };
+      return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
     }
 
     function executeSearch() {
@@ -251,8 +277,6 @@
             lastKnownEvents[cIdx] = text;
           }
 
-          // Un-smash corrupted CSV cells where the converter merged multiple heats
-          // Looks for pattern like "42 #945" to split the text block apart safely
           let chunks = text.split(/(?=\b\d{1,3}\s+#\d{1,4}\b)/);
 
           chunks.forEach(chunk => {
@@ -264,15 +288,11 @@
                 let displayDiv = lastKnownEvents[cIdx] || "Division parsing error";
                 let displayName = chunkText;
 
-                // Extract exact heat number if embedded (e.g., "42 #945")
                 let embeddedHeatMatch = chunkText.match(/^(\d{1,3})\s+#\d{1,4}/);
                 if (embeddedHeatMatch) {
                    displayHeat = embeddedHeatMatch[1];
-                   
-                   // Clean the ID out of the name string
                    displayName = chunkText.replace(/^\d{1,3}\s+#\d{1,4}\s+/, '');
                    
-                   // Attempt to safely extract the event division (e.g., "DDSF F 1 2-1 5")
                    let divMatch = displayName.match(/^(SR|DD|WH|IR|Team|DDC|SCT)[A-Za-z0-9\-\s\+]{2,15}/i);
                    if (divMatch) {
                        displayDiv = divMatch[0].trim();
@@ -280,7 +300,6 @@
                    }
                 }
 
-                // Clean up massive strings for the UI
                 if (displayName.length > 45) {
                     let matchIdx = displayName.toLowerCase().indexOf(term);
                     let start = Math.max(0, matchIdx - 15);
@@ -296,7 +315,9 @@
                   station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
                   division: displayDiv,
                   day: schedule.day,
-                  time: schedule.time
+                  time: schedule.time,
+                  block: schedule.block,
+                  blockName: schedule.blockName
                 });
               }
             }
@@ -304,7 +325,6 @@
         });
       });
 
-      // Filter out duplicates in case the CSV split a name across two identical rows
       const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
       tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
 
@@ -316,12 +336,19 @@
       uniqueMatches.forEach(item => {
         feed.innerHTML += `
           <div class="card">
-            <div class="card-top">
-              <span class="schedule-time">${item.day} @ ${item.time}</span>
-              <span class="heat-badge">Heat ${item.heat} | ${item.station}</span>
+            <div class="card-header">
+              <div class="block-info">
+                <span class="block-time">${item.day} @ ${item.time}</span>
+                <span>${item.block} | ${item.blockName}</span>
+              </div>
+              <div class="heat-station-badge">
+                H${item.heat} | ${item.station.replace('Station ', 'S')}
+              </div>
             </div>
-            <div class="athlete-name">${item.name}</div>
-            <div class="event-info">${item.division}</div>
+            <div class="card-body">
+              <div class="athlete-name">${item.name}</div>
+              <div class="event-info">${item.division}</div>
+            </div>
           </div>
         `;
       });
