@@ -34,22 +34,6 @@
       color: #93c5fd;
       margin-top: 6px;
       font-weight: 500;
-      margin-bottom: 16px;
-    }
-    .header-btn {
-      display: inline-block;
-      background: #f97316;
-      color: white;
-      text-decoration: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      box-shadow: 0 2px 4px rgba(249, 115, 22, 0.3);
-      transition: opacity 0.2s;
-    }
-    .header-btn:active {
-      opacity: 0.8;
     }
     .panel {
       background: #ffffff;
@@ -58,6 +42,23 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.05);
       margin-bottom: 16px;
       border: 1px solid #e2e8f0;
+    }
+    .auth-label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+    .auth-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: #f97316;
     }
     .file-drop {
       border: 2px dashed #cbd5e1;
@@ -161,33 +162,53 @@
   <header>
     <h1>2026 Nationals Lookup</h1>
     <p>Search athletes across all heats & divisions</p>
-    <a href="https://www.revolutionise.com.au/skippingaustralia/" target="_blank" class="header-btn">View Official Program</a>
   </header>
 
-  <div class="panel hidden" id="uploadPanel">
-    <div class="file-drop">
-      <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
-      <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Convert the PDF to CSV and select it here.</p>
-      <input type="file" id="csvFileInput" accept=".csv" />
-    </div>
+  <div class="panel" id="disclaimerPanel">
+    <label class="auth-label">
+      <input type="checkbox" id="authCheck" class="auth-checkbox" />
+      I confirm that I am a parent, guardian, or member of the Northbridge Knockouts.
+    </label>
   </div>
 
-  <div id="searchSection" class="hidden">
-    <div class="panel" style="padding: 16px;">
-      <input
-        type="search"
-        id="nameQuery"
-        class="search-input"
-        placeholder="Type athlete name (e.g. Claire, Nate)..."
-        oninput="executeSearch()"
-      />
-      <div id="tallyDisplay"></div>
+  <div id="appContainer" class="hidden">
+    <div class="panel hidden" id="uploadPanel">
+      <div class="file-drop">
+        <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
+        <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Convert the PDF to CSV and select it here.</p>
+        <input type="file" id="csvFileInput" accept=".csv" />
+      </div>
     </div>
-    <div id="resultsFeed"></div>
+
+    <div id="searchSection" class="hidden">
+      <div class="panel" style="padding: 16px;">
+        <input
+          type="search"
+          id="nameQuery"
+          class="search-input"
+          placeholder="Type athlete name (e.g. Claire, Nate)..."
+          oninput="executeSearch()"
+        />
+        <div id="tallyDisplay"></div>
+      </div>
+      <div id="resultsFeed"></div>
+    </div>
   </div>
 
   <script>
     let parsedSheet = [];
+
+    document.getElementById('authCheck').addEventListener('change', function(e) {
+      const appContainer = document.getElementById('appContainer');
+      if (e.target.checked) {
+        appContainer.classList.remove('hidden');
+        if (document.getElementById('nameQuery')) {
+          document.getElementById('nameQuery').focus();
+        }
+      } else {
+        appContainer.classList.add('hidden');
+      }
+    });
 
     window.onload = function() {
       Papa.parse("heats.csv", {
@@ -221,13 +242,11 @@
       const h = parseInt(heatNum);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
 
-      // Sunday 27.09
       if (h >= 1 && h <= 67) {
         if (h <= 28) return { day: "Sunday", time: "09:45 - 11:20", block: "Heats 1-28", blockName: "SRSE (11+), SRSS (7U-10)" };
         if (h <= 53) return { day: "Sunday", time: "11:50 - 13:20", block: "Heats 31-53", blockName: "DDSF (All Ages)" };
         return { day: "Sunday", time: "14:05 - 14:45", block: "Heats 56-67", blockName: "Individual Freestyle (7U/8)" };
       }
-      // Monday 28.09
       if (h >= 70 && h <= 214) {
         if (h <= 99) return { day: "Monday", time: "08:00 - 08:45", block: "Heats 70-99", blockName: "SRSS (11+), SRSE 1MIN (7U-10)" };
         if (h <= 112) return { day: "Monday", time: "08:45 - 09:10", block: "Heats 104-112", blockName: "SRSR (All Ages)" };
@@ -236,7 +255,6 @@
         if (h <= 189) return { day: "Monday", time: "11:40 - 15:00", block: "Heats 141-189", blockName: "SRIF (11-29F)" };
         return { day: "Monday", time: "15:10 - 16:40", block: "Heats 191-214", blockName: "SRTF (9-10/11-12/12-15/16+)" };
       }
-      // Tuesday 29.09
       if (h >= 216 && h <= 331) {
         if (h <= 228) return { day: "Tuesday", time: "08:30 - 09:00", block: "Heats 216-228", blockName: "SRDR (All Ages)" };
         if (h <= 236) return { day: "Tuesday", time: "09:10 - 09:25", block: "Heats 230-236", blockName: "DDSR (11+), DDCS (12-15, 16+)" };
@@ -245,7 +263,6 @@
         if (h <= 284) return { day: "Tuesday", time: "12:15 - 13:20", block: "Heats 269-284", blockName: "SRIF (11+M)" };
         return { day: "Tuesday", time: "13:35 - 16:20", block: "Heats 286-331", blockName: "SRPF (11+)" };
       }
-      // Wednesday 30.09
       if (h >= 333 && h <= 382) {
         if (h <= 336) return { day: "Wednesday", time: "09:00 - 09:20", block: "Heats 333-336", blockName: "SRTU (11-14/15+)" };
         if (h <= 350) return { day: "Wednesday", time: "09:30 - 10:10", block: "Heats 339-350", blockName: "DDPF (12-15/16+)" };
@@ -253,7 +270,6 @@
         if (h <= 379) return { day: "Wednesday", time: "12:30 - 13:40", block: "Heats 374-379", blockName: "Team Show" };
         return { day: "Wednesday", time: "14:20 - 14:40", block: "Heats 380-382", blockName: "DDC Performance" };
       }
-      // Thursday 01.10
       if (h >= 1000) {
         return { day: "Thursday", time: "09:00 - 14:30", block: "Grand Champs", blockName: "Overall Championships" };
       }
