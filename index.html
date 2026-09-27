@@ -259,7 +259,7 @@
               matches.push({
                 name: text,
                 heat: currentHeat,
-                station: cIdx > 0 ? \`Station \${cIdx}\` : 'Station 1',
+                station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
                 division: lastKnownEvents[cIdx] || "Division parsing error",
                 day: schedule.day,
                 time: schedule.time
@@ -270,7 +270,7 @@
       });
 
       const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
-      tally.innerHTML = \`<span class="tally-badge">Total Events Found: \${uniqueMatches.length}</span>\`;
+      tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
 
       if (uniqueMatches.length === 0) {
         feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">No entries matching that name.</p>';
@@ -278,16 +278,16 @@
       }
 
       uniqueMatches.forEach(item => {
-        feed.innerHTML += \`
+        feed.innerHTML += `
           <div class="card">
             <div class="card-top">
-              <span class="schedule-time">\${item.day} @ \${item.time}</span>
-              <span class="heat-badge">Heat \${item.heat} | \${item.station}</span>
+              <span class="schedule-time">${item.day} @ ${item.time}</span>
+              <span class="heat-badge">Heat ${item.heat} | ${item.station}</span>
             </div>
-            <div class="athlete-name">\${item.name}</div>
-            <div class="event-info">\${item.division}</div>
+            <div class="athlete-name">${item.name}</div>
+            <div class="event-info">${item.division}</div>
           </div>
-        \`;
+        `;
       });
     }
   </script>
