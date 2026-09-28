@@ -232,9 +232,9 @@
     </div>
 
     <!-- Live Timing/Schedule Status Tracker -->
-    <div id="statusBanner" class="panel status-banner hidden">
+    <div id="statusBanner" class="panel status-banner">
       <div style="font-size: 0.9rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;" id="currentTimeDisplay">--:--</div>
-      <div style="font-size: 1.15rem; font-weight: 800; margin-top: 6px;" id="scheduleStatusText">Calculating schedule...</div>
+      <div style="font-size: 1.15rem; font-weight: 800; margin-top: 6px;" id="scheduleStatusText">Waiting for live data...</div>
     </div>
 
     <div class="panel hidden" id="uploadPanel">
@@ -245,7 +245,8 @@
       </div>
     </div>
 
-    <div id="searchSection" class="hidden">
+    <!-- The Search Section is NEVER hidden once the container unlocks -->
+    <div id="searchSection">
       <div class="panel" style="padding: 16px;">
         <input
           type="search"
@@ -264,49 +265,71 @@
     let parsedSheet = [];
     let currentLiveHeat = null; 
 
-    // Hardcoded dates for the 2026 Tournament to calculate late/early offsets
+    // Hardcoded dates for the 2026 Tournament
     const TOURNAMENT_DATES = {
-      "Sunday": "2026-09-27",
-      "Monday": "2026-09-28",
-      "Tuesday": "2026-09-29",
-      "Wednesday": "2026-09-30",
-      "Thursday": "2026-10-01"
+      "Sunday": "2026/09/27",
+      "Monday": "2026/09/28",
+      "Tuesday": "2026/09/29",
+      "Wednesday": "2026/09/30",
+      "Thursday": "2026/10/01"
     };
 
-    document.getElementById('authCheck').addEventListener('change', function(e) {
-      const appContainer = document.getElementById('appContainer');
-      if (e.target.checked) {
-        appContainer.classList.remove('hidden');
-        if (document.getElementById('nameQuery')) {
-          document.getElementById('nameQuery').focus();
-        }
-        updateTimeAndStatus(); // Trigger clock immediately
-      } else {
-        appContainer.classList.add('hidden');
-      }
+    // Ensure absolutely nothing runs until the page is fully loaded
+    document.addEventListener("DOMContentLoaded", function() {
+        
+        document.getElementById('authCheck').addEventListener('change', function(e) {
+          const appContainer = document.getElementById('appContainer');
+          if (e.target.checked) {
+            appContainer.classList.remove('hidden');
+            document.getElementById('nameQuery').focus();
+            updateTimeAndStatus();
+          } else {
+            appContainer.classList.add('hidden');
+          }
+        });
+
+        // Ping the clock every 15 seconds safely
+        setInterval(updateTimeAndStatus, 15000);
+
+        // Ping the Google Sheet every 30 seconds safely
+        setInterval(fetchLiveHeat, 30000); 
+        fetchLiveHeat();
+
+        // Load the CSV in the background
+        Papa.parse("heats.csv", {
+          download: true,
+          complete: function(parsed) {
+            // Failsafe in case a 404 page is parsed instead of a CSV
+            if (parsed.data.length > 0 && String(parsed.data[0][0]).includes("<!DOCTYPE")) {
+                document.getElementById('uploadPanel').classList.remove('hidden');
+                document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
+            } else {
+                parsedSheet = parsed.data;
+            }
+          },
+          error: function() {
+            document.getElementById('uploadPanel').classList.remove('hidden');
+          }
+        });
     });
 
-    // Calculates if the current heat is running ahead, behind, or on schedule
     function updateTimeAndStatus() {
       try {
         const now = new Date();
-        // Safe time string for older mobile browsers
         const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        let statusHtml = "Waiting for live heat data...";
+        let statusHtml = '<span style="color: #64748b;">Live tracker offline or waiting...</span>';
         
         if (currentLiveHeat !== null) {
           const schedule = getScheduleDetails(currentLiveHeat);
           
           if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
-            const dateStr = TOURNAMENT_DATES[schedule.day];
+            const dateStr = TOURNAMENT_DATES[schedule.day]; // Pre-formatted with slashes for Safari safety
             const times = schedule.time.split(" - ");
             
             if (times.length === 2) {
-              const startStr = `${dateStr}T${times[0]}:00`;
-              const endStr = `${dateStr}T${times[1]}:00`;
-              const startTime = new Date(startStr);
-              const endTime = new Date(endStr);
+              const startTime = new Date(`${dateStr} ${times[0]}:00`);
+              const endTime = new Date(`${dateStr} ${times[1]}:00`);
               
               if (!isNaN(startTime) && !isNaN(endTime)) {
                 const diffStartMins = Math.floor((now - startTime) / 60000);
@@ -321,24 +344,17 @@
                 }
               }
             }
+          } else {
+              statusHtml = `<span style="color: #64748b;">Schedule info TBD for Heat ${currentLiveHeat}</span>`;
           }
         }
         
-        const statusContainer = document.getElementById('statusBanner');
-        if (currentLiveHeat !== null) {
-            statusContainer.classList.remove('hidden');
-            document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
-            document.getElementById('scheduleStatusText').innerHTML = statusHtml;
-        } else {
-            statusContainer.classList.add('hidden');
-        }
+        document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
+        document.getElementById('scheduleStatusText').innerHTML = statusHtml;
       } catch (err) {
-        console.error("Clock formatting issue skipped:", err);
+        console.error("Time calculation skipped:", err);
       }
     }
-
-    // Ping the clock every 15 seconds
-    setInterval(updateTimeAndStatus, 15000);
 
     function fetchLiveHeat() {
       const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv"; 
@@ -347,7 +363,6 @@
         .then(response => response.text())
         .then(csvText => {
           const heatNum = csvText.split('\n')[0].split(',')[0].trim();
-          
           if(heatNum && !isNaN(heatNum)) {
              currentLiveHeat = parseInt(heatNum, 10);
              document.getElementById('liveBanner').classList.remove('hidden');
@@ -361,28 +376,10 @@
           }
         })
         .catch(err => {
-            console.log("Live feed offline");
             currentLiveHeat = null;
             updateTimeAndStatus();
         });
     }
-    // Ping the Google Sheet every 30 seconds
-    setInterval(fetchLiveHeat, 30000); 
-    fetchLiveHeat();
-
-    window.onload = function() {
-      Papa.parse("heats.csv", {
-        download: true,
-        complete: function(parsed) {
-          parsedSheet = parsed.data;
-          document.getElementById('searchSection').classList.remove('hidden');
-        },
-        error: function() {
-          document.getElementById('uploadPanel').classList.remove('hidden');
-          document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv not found in repository.</span><br>Upload it manually below:";
-        }
-      });
-    };
 
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
@@ -392,7 +389,6 @@
         complete: function(parsed) {
           parsedSheet = parsed.data;
           document.getElementById('uploadPanel').classList.add('hidden');
-          document.getElementById('searchSection').classList.remove('hidden');
           document.getElementById('nameQuery').focus();
         }
       });
@@ -450,6 +446,11 @@
 
       feed.innerHTML = '';
       tally.innerHTML = '';
+
+      if (parsedSheet.length === 0) {
+          feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
+          return;
+      }
 
       const matches = [];
       let currentHeat = "Unknown";
@@ -547,8 +548,4 @@
           <div class="card">
             <div class="card-header">
               <div class="block-info">
-                <span class="block-time">${item.day} @ ${item.time}</span>
-                <span>${item.block} | ${item.blockName}</span>
-              </div>
-              <div class="heat-station-badge">
-                H${item.h
+                <span class="block-time">${item.d
