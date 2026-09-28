@@ -229,7 +229,7 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v4</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v5</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
@@ -281,6 +281,30 @@
   </div>
 
   <script>
+    // -----------------------------------------------------------
+    // 1. Core Interface Logic (Executes Immediately)
+    // -----------------------------------------------------------
+    const authCheck = document.getElementById('authCheck');
+    const appContainer = document.getElementById('appContainer');
+
+    function syncUI() {
+      if (authCheck.checked) {
+        appContainer.classList.remove('hidden');
+        if (typeof updateTimeAndStatus === "function") updateTimeAndStatus();
+      } else {
+        appContainer.classList.add('hidden');
+      }
+    }
+
+    // Listens for manual taps
+    authCheck.addEventListener('change', syncUI);
+    // Forces the UI to open immediately if the browser auto-filled the checkmark
+    syncUI(); 
+
+
+    // -----------------------------------------------------------
+    // 2. Global Variables & Dictionaries
+    // -----------------------------------------------------------
     let parsedSheet = [];
     let currentLiveHeat = null; 
 
@@ -292,19 +316,9 @@
       "Thursday": "2026/10/01"
     };
 
-    // Master Unlocking Logic
-    document.getElementById('authCheck').addEventListener('change', function(e) {
-      const appContainer = document.getElementById('appContainer');
-      if (e.target.checked) {
-        appContainer.classList.remove('hidden');
-        document.getElementById('nameQuery').focus();
-        updateTimeAndStatus();
-      } else {
-        appContainer.classList.add('hidden');
-      }
-    });
-
-    // Time and Status Engine
+    // -----------------------------------------------------------
+    // 3. Status and Live Tracking Engines
+    // -----------------------------------------------------------
     function updateTimeAndStatus() {
       try {
         const now = new Date();
@@ -349,9 +363,7 @@
     }
     setInterval(updateTimeAndStatus, 15000);
 
-    // Live Flowscore Fetch Engine
     function fetchLiveHeat() {
-      // Bypasses cache by adding a random number to the URL request
       const cacheBuster = new Date().getTime();
       const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=${cacheBuster}`; 
       
@@ -379,42 +391,56 @@
     setInterval(fetchLiveHeat, 30000); 
     fetchLiveHeat();
 
-    // CSV Database Fetch Engine (with cache-busting timestamp)
-    const csvUrl = "heats.csv?v=" + new Date().getTime();
-    Papa.parse(csvUrl, {
-      download: true,
-      complete: function(parsed) {
-        if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
-            parsedSheet = parsed.data;
-            document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
-        } else {
-            document.getElementById('uploadPanel').classList.remove('hidden');
-            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
-            document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
+    // -----------------------------------------------------------
+    // 4. Data Parsing Engines
+    // -----------------------------------------------------------
+    function loadCSVData() {
+        if (typeof Papa === 'undefined') {
+            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load. Check connection.</span>`;
+            return;
         }
-      },
-      error: function() {
-        document.getElementById('uploadPanel').classList.remove('hidden');
-        document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
-      }
-    });
 
-    // Manual Upload Fallback
+        const csvUrl = "heats.csv?v=" + new Date().getTime();
+        Papa.parse(csvUrl, {
+          download: true,
+          complete: function(parsed) {
+            if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
+                parsedSheet = parsed.data;
+                document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
+            } else {
+                document.getElementById('uploadPanel').classList.remove('hidden');
+                document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
+                document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
+            }
+          },
+          error: function() {
+            document.getElementById('uploadPanel').classList.remove('hidden');
+            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
+          }
+        });
+    }
+    
+    // Attempt loading CSV shortly after page execution
+    setTimeout(loadCSVData, 500);
+
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
       if (!targetFile) return;
 
-      Papa.parse(targetFile, {
-        complete: function(parsed) {
-          parsedSheet = parsed.data;
-          document.getElementById('uploadPanel').classList.add('hidden');
-          document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
-          document.getElementById('nameQuery').focus();
-        }
-      });
+      if (typeof Papa !== 'undefined') {
+          Papa.parse(targetFile, {
+            complete: function(parsed) {
+              parsedSheet = parsed.data;
+              document.getElementById('uploadPanel').classList.add('hidden');
+              document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
+            }
+          });
+      }
     });
 
-    // Schedule Dictionary
+    // -----------------------------------------------------------
+    // 5. Schedule Mapping & Search Logic
+    // -----------------------------------------------------------
     function getScheduleDetails(heatNum) {
       const h = parseInt(heatNum);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
@@ -454,7 +480,6 @@
       return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
     }
 
-    // Main Search Driver
     function executeSearch() {
       const term = document.getElementById('nameQuery').value.trim().toLowerCase();
       const feed = document.getElementById('resultsFeed');
@@ -516,33 +541,4 @@
                        displayName = displayName.replace(divMatch[0], '').trim();
                    }
                 }
-
-                if (displayName.length > 45) {
-                    let matchIdx = displayName.toLowerCase().indexOf(term);
-                    let start = Math.max(0, matchIdx - 15);
-                    let end = Math.min(displayName.length, matchIdx + term.length + 15);
-                    displayName = (start > 0 ? "..." : "") + displayName.substring(start, end).trim() + (end < displayName.length ? "..." : "");
-                }
-
-                const schedule = getScheduleDetails(displayHeat);
-
-                matches.push({
-                  name: displayName,
-                  heat: displayHeat,
-                  station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
-                  division: displayDiv,
-                  day: schedule.day,
-                  time: schedule.time,
-                  block: schedule.block,
-                  blockName: schedule.blockName
-                });
-              }
-            }
-          });
-        });
-      });
-
-      const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
-      tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
-
-  
+                
