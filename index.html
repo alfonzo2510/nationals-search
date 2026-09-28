@@ -63,13 +63,30 @@
     .live-banner {
       background: #ef4444;
       color: white;
-      padding: 12px;
-      text-align: center;
+      padding: 12px 16px;
       font-weight: 800;
       border-radius: 12px;
       margin-bottom: 16px;
       font-size: 1.1rem;
       box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      text-align: left;
+    }
+    .update-btn {
+      background: #ffffff; 
+      color: #ef4444; 
+      padding: 6px 12px; 
+      border-radius: 6px; 
+      font-size: 0.9rem; 
+      text-decoration: none; 
+      font-weight: 800; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: opacity 0.2s;
+    }
+    .update-btn:active {
+      opacity: 0.8;
     }
     .file-drop {
       border: 2px dashed #cbd5e1;
@@ -202,7 +219,10 @@
   <div id="appContainer" class="hidden">
     
     <div id="liveBanner" class="live-banner hidden">
-      🔥 LIVE: Currently on Heat <span id="currentHeatNum">...</span>
+      <span>🔥 LIVE: Heat <span id="currentHeatNum">...</span></span>
+      <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn">
+        Update
+      </a>
     </div>
 
     <div class="panel hidden" id="uploadPanel">
@@ -230,9 +250,8 @@
 
   <script>
     let parsedSheet = [];
-    let currentLiveHeat = null; // Global variable to store the live heat
+    let currentLiveHeat = null; 
 
-    // Northbridge Knockouts Auth Toggle
     document.getElementById('authCheck').addEventListener('change', function(e) {
       const appContainer = document.getElementById('appContainer');
       if (e.target.checked) {
@@ -245,7 +264,6 @@
       }
     });
 
-    // Google Sheets Live Heat Fetcher
     function fetchLiveHeat() {
       const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv"; 
       
@@ -258,7 +276,6 @@
              currentLiveHeat = parseInt(heatNum, 10);
              document.getElementById('liveBanner').classList.remove('hidden');
              document.getElementById('currentHeatNum').innerText = heatNum;
-             // Refresh search results to update countdown badges if search is active
              executeSearch(); 
           } else {
              currentLiveHeat = null;
@@ -273,7 +290,6 @@
     setInterval(fetchLiveHeat, 30000); 
     fetchLiveHeat();
 
-    // Auto-load CSV file from GitHub repository
     window.onload = function() {
       Papa.parse("heats.csv", {
         download: true,
@@ -288,7 +304,6 @@
       });
     };
 
-    // Manual Upload Fallback
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
       if (!targetFile) return;
@@ -303,18 +318,15 @@
       });
     });
 
-    // Heat Number to Event Program Cross-Reference
     function getScheduleDetails(heatNum) {
       const h = parseInt(heatNum);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
 
-      // Sunday 27.09
       if (h >= 1 && h <= 67) {
         if (h <= 28) return { day: "Sunday", time: "09:45 - 11:20", block: "Heats 1-28", blockName: "SRSE (11+), SRSS (7U-10)" };
         if (h <= 53) return { day: "Sunday", time: "11:50 - 13:20", block: "Heats 31-53", blockName: "DDSF (All Ages)" };
         return { day: "Sunday", time: "14:05 - 14:45", block: "Heats 56-67", blockName: "Individual Freestyle (7U/8)" };
       }
-      // Monday 28.09
       if (h >= 70 && h <= 214) {
         if (h <= 99) return { day: "Monday", time: "08:00 - 08:45", block: "Heats 70-99", blockName: "SRSS (11+), SRSE 1MIN (7U-10)" };
         if (h <= 112) return { day: "Monday", time: "08:45 - 09:10", block: "Heats 104-112", blockName: "SRSR (All Ages)" };
@@ -323,7 +335,6 @@
         if (h <= 189) return { day: "Monday", time: "11:40 - 15:00", block: "Heats 141-189", blockName: "SRIF (11-29F)" };
         return { day: "Monday", time: "15:10 - 16:40", block: "Heats 191-214", blockName: "SRTF (9-10/11-12/12-15/16+)" };
       }
-      // Tuesday 29.09
       if (h >= 216 && h <= 331) {
         if (h <= 228) return { day: "Tuesday", time: "08:30 - 09:00", block: "Heats 216-228", blockName: "SRDR (All Ages)" };
         if (h <= 236) return { day: "Tuesday", time: "09:10 - 09:25", block: "Heats 230-236", blockName: "DDSR (11+), DDCS (12-15, 16+)" };
@@ -332,7 +343,6 @@
         if (h <= 284) return { day: "Tuesday", time: "12:15 - 13:20", block: "Heats 269-284", blockName: "SRIF (11+M)" };
         return { day: "Tuesday", time: "13:35 - 16:20", block: "Heats 286-331", blockName: "SRPF (11+)" };
       }
-      // Wednesday 30.09
       if (h >= 333 && h <= 382) {
         if (h <= 336) return { day: "Wednesday", time: "09:00 - 09:20", block: "Heats 333-336", blockName: "SRTU (11-14/15+)" };
         if (h <= 350) return { day: "Wednesday", time: "09:30 - 10:10", block: "Heats 339-350", blockName: "DDPF (12-15/16+)" };
@@ -340,7 +350,6 @@
         if (h <= 379) return { day: "Wednesday", time: "12:30 - 13:40", block: "Heats 374-379", blockName: "Team Show" };
         return { day: "Wednesday", time: "14:20 - 14:40", block: "Heats 380-382", blockName: "DDC Performance" };
       }
-      // Thursday 01.10
       if (h >= 1000) {
         return { day: "Thursday", time: "09:00 - 14:30", block: "Grand Champs", blockName: "Overall Championships" };
       }
@@ -348,20 +357,17 @@
       return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
     }
 
-    // Main Search Logic
     function executeSearch() {
       const term = document.getElementById('nameQuery').value.trim().toLowerCase();
       const feed = document.getElementById('resultsFeed');
       const tally = document.getElementById('tallyDisplay');
       
-      // Stop rendering if user hasn't typed enough
       if (term.length < 2) {
           feed.innerHTML = '';
           tally.innerHTML = '';
           return;
       }
 
-      // Clear layout for fresh results
       feed.innerHTML = '';
       tally.innerHTML = '';
 
@@ -444,7 +450,6 @@
       uniqueMatches.forEach(item => {
         let countdownHtml = '';
         
-        // Calculate heats away if the live banner is active
         if (currentLiveHeat !== null) {
           let hNum = parseInt(item.heat, 10);
           if (!isNaN(hNum)) {
