@@ -54,8 +54,8 @@
       line-height: 1.4;
     }
     .auth-checkbox {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       cursor: pointer;
       flex-shrink: 0;
       accent-color: #f97316;
@@ -288,47 +288,52 @@
 
     // Calculates if the current heat is running ahead, behind, or on schedule
     function updateTimeAndStatus() {
-      const now = new Date();
-      const timeString = now.toLocaleTimeString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-      
-      let statusHtml = "Waiting for live heat data...";
-      
-      if (currentLiveHeat !== null) {
-        const schedule = getScheduleDetails(currentLiveHeat);
+      try {
+        const now = new Date();
+        // Safe time string for older mobile browsers
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
-          const dateStr = TOURNAMENT_DATES[schedule.day];
-          const times = schedule.time.split(" - ");
+        let statusHtml = "Waiting for live heat data...";
+        
+        if (currentLiveHeat !== null) {
+          const schedule = getScheduleDetails(currentLiveHeat);
           
-          if (times.length === 2) {
-            const startStr = `${dateStr}T${times[0]}:00`;
-            const endStr = `${dateStr}T${times[1]}:00`;
-            const startTime = new Date(startStr);
-            const endTime = new Date(endStr);
+          if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
+            const dateStr = TOURNAMENT_DATES[schedule.day];
+            const times = schedule.time.split(" - ");
             
-            if (!isNaN(startTime) && !isNaN(endTime)) {
-              const diffStartMins = Math.floor((now - startTime) / 60000);
-              const diffEndMins = Math.floor((now - endTime) / 60000);
+            if (times.length === 2) {
+              const startStr = `${dateStr}T${times[0]}:00`;
+              const endStr = `${dateStr}T${times[1]}:00`;
+              const startTime = new Date(startStr);
+              const endTime = new Date(endStr);
               
-              if (now >= startTime && now <= endTime) {
-                statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
-              } else if (now < startTime) {
-                statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
-              } else if (now > endTime) {
-                statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
+              if (!isNaN(startTime) && !isNaN(endTime)) {
+                const diffStartMins = Math.floor((now - startTime) / 60000);
+                const diffEndMins = Math.floor((now - endTime) / 60000);
+                
+                if (now >= startTime && now <= endTime) {
+                  statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
+                } else if (now < startTime) {
+                  statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
+                } else if (now > endTime) {
+                  statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
+                }
               }
             }
           }
         }
-      }
-      
-      const statusContainer = document.getElementById('statusBanner');
-      if (currentLiveHeat !== null) {
-          statusContainer.classList.remove('hidden');
-          document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
-          document.getElementById('scheduleStatusText').innerHTML = statusHtml;
-      } else {
-          statusContainer.classList.add('hidden');
+        
+        const statusContainer = document.getElementById('statusBanner');
+        if (currentLiveHeat !== null) {
+            statusContainer.classList.remove('hidden');
+            document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
+            document.getElementById('scheduleStatusText').innerHTML = statusHtml;
+        } else {
+            statusContainer.classList.add('hidden');
+        }
+      } catch (err) {
+        console.error("Clock formatting issue skipped:", err);
       }
     }
 
@@ -546,10 +551,4 @@
                 <span>${item.block} | ${item.blockName}</span>
               </div>
               <div class="heat-station-badge">
-                H${item.heat} | ${item.station.replace('Station ', 'S')}
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="athlete-name">${item.name}</div>
-              ${countdownHtml}
-           
+                H${item.h
