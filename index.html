@@ -74,32 +74,42 @@
       accent-color: #f97316;
     }
     .live-banner {
-      background: #ef4444;
+      background: #ef4444; /* Default Red */
       color: white;
       padding: 12px 16px;
       font-weight: 800;
       border-radius: 12px;
       margin-bottom: 12px;
       font-size: 1.1rem;
-      box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
       display: flex; 
       justify-content: space-between; 
       align-items: center; 
       text-align: left;
+      transition: background 0.5s ease;
     }
     .update-btn {
       background: #ffffff; 
-      color: #ef4444; 
+      color: #0f172a; 
       padding: 6px 12px; 
       border-radius: 6px; 
       font-size: 0.9rem; 
       text-decoration: none; 
       font-weight: 800; 
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      transition: opacity 0.2s;
+      transition: all 0.2s;
     }
     .update-btn:active {
       opacity: 0.8;
+    }
+    @keyframes pulse-animation {
+      0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    }
+    .pulse-btn {
+      animation: pulse-animation 2s infinite;
+      border: 2px solid white;
     }
     .status-banner {
       text-align: center;
@@ -230,7 +240,7 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v8</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v9</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
@@ -242,9 +252,10 @@
   </div>
 
   <div id="appContainer" class="hidden">
+    
     <div id="liveBanner" class="live-banner hidden">
-      <span>🔥 LIVE: Heat <span id="currentHeatNum">...</span></span>
-      <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn">
+      <span><span id="liveLabel">🔥 LIVE: Heat</span> <span id="currentHeatNum">...</span></span>
+      <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn" id="updateBtn">
         Update
       </a>
     </div>
@@ -383,9 +394,41 @@
         .then(csvText => {
           const heatNum = csvText.split('\n')[0].split(',')[0].trim();
           if(heatNum && !isNaN(heatNum)) {
-             window.currentLiveHeat = parseInt(heatNum, 10);
+             
+             // --- LOCAL MEMORY STALENESS TRACKER ---
+             let lastHeat = localStorage.getItem('nk_last_heat');
+             let timestamp = localStorage.getItem('nk_heat_timestamp');
+             const now = new Date().getTime();
+
+             if (lastHeat !== heatNum || !timestamp) {
+                 localStorage.setItem('nk_last_heat', heatNum);
+                 localStorage.setItem('nk_heat_timestamp', now);
+                 timestamp = now;
+             }
+
+             const minsElapsed = Math.floor((now - timestamp) / 60000);
              const banner = document.getElementById('liveBanner');
              const heatDisp = document.getElementById('currentHeatNum');
+             const liveLabel = document.getElementById('liveLabel');
+             const updateBtn = document.getElementById('updateBtn');
+
+             if (banner && liveLabel && updateBtn) {
+                 if (minsElapsed >= 20) {
+                     // Stale Data UI
+                     banner.style.background = '#64748b'; 
+                     liveLabel.innerText = '⏳ Stale Data: Heat';
+                     updateBtn.classList.add('pulse-btn');
+                 } else {
+                     // Fresh Data UI
+                     banner.style.background = '#ef4444'; 
+                     let timeText = minsElapsed === 0 ? 'Just now' : `${minsElapsed}m ago`;
+                     liveLabel.innerText = `🔥 LIVE (${timeText}): Heat`;
+                     updateBtn.classList.remove('pulse-btn');
+                 }
+             }
+             // ----------------------------------------
+
+             window.currentLiveHeat = parseInt(heatNum, 10);
              if (banner) banner.classList.remove('hidden');
              if (heatDisp) heatDisp.innerText = heatNum;
              updateTimeAndStatus();
@@ -484,137 +527,4 @@
               if (!chunkText.match(/^(SR|DD|WH|IR|Station|Heat|#)$/i)) {
                 
                 let displayHeat = currentHeat;
-                let displayDiv = lastKnownEvents[cIdx] || "Division parsing error";
-                let displayName = chunkText;
-                let embeddedHeatMatch = chunkText.match(/^(\d{1,3})\s+#\d{1,4}/);
-                
-                if (embeddedHeatMatch) {
-                   displayHeat = embeddedHeatMatch[1];
-                   displayName = chunkText.replace(/^\d{1,3}\s+#\d{1,4}\s+/, '');
-                   let divMatch = displayName.match(/^(SR|DD|WH|IR|Team|DDC|SCT)[A-Za-z0-9\-\s\+]{2,15}/i);
-                   if (divMatch) {
-                       displayDiv = divMatch[0].trim();
-                       displayName = displayName.replace(divMatch[0], '').trim();
-                   }
-                }
-
-                if (displayName.length > 45) {
-                    let matchIdx = displayName.toLowerCase().indexOf(term);
-                    let start = Math.max(0, matchIdx - 15);
-                    let end = Math.min(displayName.length, matchIdx + term.length + 15);
-                    displayName = (start > 0 ? "..." : "") + displayName.substring(start, end).trim() + (end < displayName.length ? "..." : "");
-                }
-
-                const schedule = getScheduleDetails(displayHeat);
-                matches.push({
-                  name: displayName,
-                  heat: displayHeat,
-                  station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
-                  division: displayDiv,
-                  day: schedule.day,
-                  time: schedule.time,
-                  block: schedule.block,
-                  blockName: schedule.blockName
-                });
-              }
-            }
-          });
-        });
-      });
-
-      const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
-      if (tally) tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
-
-      if (uniqueMatches.length === 0) {
-        if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">No entries matching that name.</p>';
-        return;
-      }
-
-      uniqueMatches.forEach(item => {
-        let countdownHtml = '';
-        if (window.currentLiveHeat !== null) {
-          let hNum = parseInt(item.heat, 10);
-          if (!isNaN(hNum)) {
-            let heatsAway = hNum - window.currentLiveHeat;
-            if (heatsAway === 0) {
-              countdownHtml = `<div class="countdown-badge urgent">🔥 HAPPENING NOW</div><br>`;
-            } else if (heatsAway > 0 && heatsAway <= 15) {
-              countdownHtml = `<div class="countdown-badge warning">🚨 Up Next: In ${heatsAway} Heat${heatsAway > 1 ? 's' : ''}</div><br>`;
-            }
-          }
-        }
-
-        if (feed) feed.innerHTML += `
-          <div class="card">
-            <div class="card-header">
-              <div class="block-info">
-                <span class="block-time">${item.day} @ ${item.time}</span>
-                <span>${item.block} | ${item.blockName}</span>
-              </div>
-              <div class="heat-station-badge">
-                H${item.heat} | ${item.station.replace('Station ', 'S')}
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="athlete-name">${item.name}</div>
-              ${countdownHtml}
-              <div class="event-info">${item.division}</div>
-            </div>
-          </div>
-        `;
-      });
-    };
-
-    // ==========================================
-    // 3. UI SYNC LOGIC (Runs Top-Down)
-    // ==========================================
-    const authCheck = document.getElementById('authCheck');
-    const appContainer = document.getElementById('appContainer');
-
-    function syncUI() {
-      if (authCheck && appContainer) {
-        if (authCheck.checked) {
-          appContainer.classList.remove('hidden');
-          updateTimeAndStatus();
-        } else {
-          appContainer.classList.add('hidden');
-        }
-      }
-    }
-
-    if (authCheck) {
-      authCheck.addEventListener('change', syncUI);
-      syncUI(); 
-    }
-
-    const csvFileIn = document.getElementById('csvFileInput');
-    if (csvFileIn) {
-        csvFileIn.addEventListener('change', function(e) {
-          const targetFile = e.target.files[0];
-          if (!targetFile) return;
-          if (typeof Papa !== 'undefined') {
-              Papa.parse(targetFile, {
-                complete: function(parsed) {
-                  window.parsedSheet = parsed.data;
-                  const upPanel = document.getElementById('uploadPanel');
-                  const dbInd = document.getElementById('dbStatusIndicator');
-                  if (upPanel) upPanel.classList.add('hidden');
-                  if (dbInd) dbInd.innerHTML = `✅ Successfully uploaded ${window.parsedSheet.length} rows of data.`;
-                  if (typeof executeSearch === "function") executeSearch();
-                }
-              });
-          }
-        });
-    }
-
-    // ==========================================
-    // 4. START INTERVALS & DATA FETCH
-    // ==========================================
-    setInterval(updateTimeAndStatus, 15000);
-    setInterval(fetchLiveHeat, 30000); 
-    fetchLiveHeat();
-    setTimeout(loadCSVData, 100);
-
-  </script>
-</body>
-</html>
+                let displayDiv = lastKnow
