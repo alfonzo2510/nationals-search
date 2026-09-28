@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- CACHE BUSTING TAGS -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -238,12 +237,13 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v14</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v15</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
   <div class="panel" id="disclaimerPanel">
     <label class="auth-label">
+      <!-- HARD-WIRED TOGGLE -->
       <input type="checkbox" id="authCheck" class="auth-checkbox" onchange="document.getElementById('appContainer').style.display = this.checked ? 'block' : 'none'; if(typeof window.updateTimeAndStatus === 'function') window.updateTimeAndStatus();" />
       I confirm that I am a parent, guardian, or member of the Northbridge Knockouts.
     </label>
@@ -287,7 +287,7 @@
 
   <script>
     // ==========================================
-    // 1. ES5 BULLETPROOF GLOBALS
+    // 1. ES5 GLOBALS
     // ==========================================
     window.parsedSheet = [];
     window.currentLiveHeat = null; 
@@ -391,70 +391,78 @@
     };
 
     // ==========================================
-    // 3. UNIVERSAL DATA FETCHING
+    // 3. ISOLATED NETWORK DATA FETCHING
     // ==========================================
     window.fetchLiveHeat = function() {
       try {
         var cacheBuster = new Date().getTime();
         var sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=" + cacheBuster; 
         
-        // PapaParse is safer for cross-browser fetching than native Fetch
         Papa.parse(sheetCsvUrl, {
             download: true,
             complete: function(parsed) {
-                if (parsed.data && parsed.data.length > 0 && parsed.data[0][0]) {
-                    var heatNum = String(parsed.data[0][0]).trim();
-                    if(heatNum && !isNaN(parseInt(heatNum, 10))) {
-                       
-                       var timestamp = new Date().getTime();
-                       var minsElapsed = 0;
-                       try {
-                           var lastHeat = localStorage.getItem('nk_last_heat');
-                           var storedTime = localStorage.getItem('nk_heat_timestamp');
-                           if (lastHeat !== heatNum || !storedTime) {
-                               localStorage.setItem('nk_last_heat', heatNum);
-                               localStorage.setItem('nk_heat_timestamp', timestamp);
-                           } else {
-                               timestamp = parseInt(storedTime, 10);
-                           }
-                           minsElapsed = Math.floor((new Date().getTime() - timestamp) / 60000);
-                       } catch (e) {}
+                try {
+                    if (parsed.data && parsed.data.length > 0 && parsed.data[0] && parsed.data[0][0]) {
+                        var heatNumRaw = String(parsed.data[0][0]).trim().toLowerCase();
+                        
+                        // Failsafe check WITHOUT using modern .includes()
+                        if (heatNumRaw.indexOf("<!doctype") === -1 && heatNumRaw.indexOf("<html") === -1) {
+                            var heatNum = heatNumRaw.replace(/[^0-9]/g, '');
+                            
+                            if (heatNum && !isNaN(parseInt(heatNum, 10))) {
+                               var timestamp = new Date().getTime();
+                               var minsElapsed = 0;
+                               try {
+                                   var lastHeat = localStorage.getItem('nk_last_heat');
+                                   var storedTime = localStorage.getItem('nk_heat_timestamp');
+                                   if (lastHeat !== heatNum || !storedTime) {
+                                       localStorage.setItem('nk_last_heat', heatNum);
+                                       localStorage.setItem('nk_heat_timestamp', timestamp);
+                                   } else {
+                                       timestamp = parseInt(storedTime, 10);
+                                   }
+                                   minsElapsed = Math.floor((new Date().getTime() - timestamp) / 60000);
+                               } catch (e) {}
 
-                       var banner = document.getElementById('liveBanner');
-                       var heatDisp = document.getElementById('currentHeatNum');
-                       var liveLabel = document.getElementById('liveLabel');
-                       var updateBtn = document.getElementById('updateBtn');
+                               var banner = document.getElementById('liveBanner');
+                               var heatDisp = document.getElementById('currentHeatNum');
+                               var liveLabel = document.getElementById('liveLabel');
+                               var updateBtn = document.getElementById('updateBtn');
 
-                       if (banner && liveLabel && updateBtn) {
-                           if (minsElapsed >= 20) {
-                               banner.style.background = '#64748b'; 
-                               liveLabel.innerText = '⏳ Stale Data: Heat';
-                               updateBtn.classList.add('pulse-btn');
-                           } else {
-                               banner.style.background = '#ef4444'; 
-                               var timeText = minsElapsed === 0 ? 'Just now' : minsElapsed + 'm ago';
-                               liveLabel.innerText = '🔥 LIVE (' + timeText + '): Heat';
-                               updateBtn.classList.remove('pulse-btn');
-                           }
-                       }
+                               if (banner && liveLabel && updateBtn) {
+                                   if (minsElapsed >= 20) {
+                                       banner.style.background = '#64748b'; 
+                                       liveLabel.innerText = '⏳ Stale Data: Heat';
+                                       updateBtn.classList.add('pulse-btn');
+                                   } else {
+                                       banner.style.background = '#ef4444'; 
+                                       var timeText = minsElapsed === 0 ? 'Just now' : minsElapsed + 'm ago';
+                                       liveLabel.innerText = '🔥 LIVE (' + timeText + '): Heat';
+                                       updateBtn.classList.remove('pulse-btn');
+                                   }
+                               }
 
-                       window.currentLiveHeat = parseInt(heatNum, 10);
-                       if (banner) banner.style.display = 'flex';
-                       if (heatDisp) heatDisp.innerText = heatNum;
-                       window.updateTimeAndStatus();
-                       window.executeSearch(); 
+                               window.currentLiveHeat = parseInt(heatNum, 10);
+                               if (banner) banner.style.display = 'flex';
+                               if (heatDisp) heatDisp.innerText = heatNum;
+                               window.updateTimeAndStatus();
+                               window.executeSearch(); 
+                               return;
+                            }
+                        }
                     }
-                }
+                    
+                    // Fallback if data is invalid
+                    window.currentLiveHeat = null;
+                    var bannerFail = document.getElementById('liveBanner');
+                    if (bannerFail) bannerFail.style.display = 'none';
+                    window.updateTimeAndStatus();
+                    
+                } catch(e) {}
             },
-            error: function() {
-                window.currentLiveHeat = null;
-                window.updateTimeAndStatus();
-            }
+            error: function() {}
         });
-      } catch (e) {
-          window.currentLiveHeat = null;
-          window.updateTimeAndStatus();
-      }
+      } catch (e) {}
     };
 
     window.showUploadPanel = function(errorMsg) {
@@ -478,41 +486,13 @@
         Papa.parse(csvUrl, {
           download: true,
           complete: function(parsed) {
-            if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).toLowerCase().includes("<!doctype")) {
-                window.parsedSheet = parsed.data;
-                var dbInd = document.getElementById('dbStatusIndicator');
-                if(dbInd) dbInd.innerHTML = "✅ Successfully loaded " + window.parsedSheet.length + " rows of data.";
-                window.executeSearch();
-            } else {
-                window.showUploadPanel("heats.csv file missing or empty.");
-            }
-          },
-          error: function() {
-              window.showUploadPanel("heats.csv network error.");
-          }
-        });
-      } catch (e) {
-         window.showUploadPanel("Network block preventing download.");
-      }
-    };
-
-    window.executeSearch = function() {
-      try {
-        var qInput = document.getElementById('nameQuery');
-        if (!qInput) return;
-        
-        var term = qInput.value.trim().toLowerCase();
-        var feed = document.getElementById('resultsFeed');
-        var tally = document.getElementById('tallyDisplay');
-        
-        if (term.length < 2) {
-            if (feed) feed.innerHTML = '';
-            if (tally) tally.innerHTML = '';
-            return;
-        }
-
-        if (feed) feed.innerHTML = '';
-        if (tally) tally.innerHTML = '';
-
-        if (!window.parsedSheet || window.parsedSheet.length === 0) {
-            if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
+            try {
+                if (parsed.data && parsed.data.length > 0 && parsed.data[0] && parsed.data[0][0]) {
+                    var firstCell = String(parsed.data[0][0]).toLowerCase();
+                    
+                    // Safety check without modern .includes() to prevent silent callback crashes
+                    if (firstCell.indexOf("<!doctype") === -1 && firstCell.indexOf("<html") === -1) {
+                        window.parsedSheet = parsed.data;
+                        var dbInd = document.getElementById('dbStatusIndicator');
+                        if (dbInd) dbInd.innerHTML = "✅ Successfully loaded " + window.parsedSheet.length + " rows of data.";
+                        window.executeSe
