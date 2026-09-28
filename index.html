@@ -156,6 +156,23 @@
       color: #0f172a;
       margin-bottom: 6px;
     }
+    .countdown-badge {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .countdown-badge.warning {
+      background: #fef08a;
+      color: #854d0e;
+      border: 1px solid #fde047;
+    }
+    .countdown-badge.urgent {
+      background: #ef4444;
+      color: #ffffff;
+    }
     .event-info {
       font-size: 0.95rem;
       color: #334155;
@@ -213,6 +230,7 @@
 
   <script>
     let parsedSheet = [];
+    let currentLiveHeat = null; // Global variable to store the live heat
 
     // Northbridge Knockouts Auth Toggle
     document.getElementById('authCheck').addEventListener('change', function(e) {
@@ -237,13 +255,20 @@
           const heatNum = csvText.split('\n')[0].split(',')[0].trim();
           
           if(heatNum && !isNaN(heatNum)) {
+             currentLiveHeat = parseInt(heatNum, 10);
              document.getElementById('liveBanner').classList.remove('hidden');
              document.getElementById('currentHeatNum').innerText = heatNum;
+             // Refresh search results to update countdown badges if search is active
+             executeSearch(); 
           } else {
+             currentLiveHeat = null;
              document.getElementById('liveBanner').classList.add('hidden');
           }
         })
-        .catch(err => console.log("Live feed offline"));
+        .catch(err => {
+            console.log("Live feed offline");
+            currentLiveHeat = null;
+        });
     }
     setInterval(fetchLiveHeat, 30000); 
     fetchLiveHeat();
@@ -328,10 +353,17 @@
       const term = document.getElementById('nameQuery').value.trim().toLowerCase();
       const feed = document.getElementById('resultsFeed');
       const tally = document.getElementById('tallyDisplay');
+      
+      // Stop rendering if user hasn't typed enough
+      if (term.length < 2) {
+          feed.innerHTML = '';
+          tally.innerHTML = '';
+          return;
+      }
+
+      // Clear layout for fresh results
       feed.innerHTML = '';
       tally.innerHTML = '';
-
-      if (term.length < 2) return;
 
       const matches = [];
       let currentHeat = "Unknown";
@@ -410,6 +442,22 @@
       }
 
       uniqueMatches.forEach(item => {
+        let countdownHtml = '';
+        
+        // Calculate heats away if the live banner is active
+        if (currentLiveHeat !== null) {
+          let hNum = parseInt(item.heat, 10);
+          if (!isNaN(hNum)) {
+            let heatsAway = hNum - currentLiveHeat;
+            
+            if (heatsAway === 0) {
+              countdownHtml = `<div class="countdown-badge urgent">🔥 HAPPENING NOW</div><br>`;
+            } else if (heatsAway > 0 && heatsAway <= 15) {
+              countdownHtml = `<div class="countdown-badge warning">🚨 Up Next: In ${heatsAway} Heat${heatsAway > 1 ? 's' : ''}</div><br>`;
+            }
+          }
+        }
+
         feed.innerHTML += `
           <div class="card">
             <div class="card-header">
@@ -423,6 +471,7 @@
             </div>
             <div class="card-body">
               <div class="athlete-name">${item.name}</div>
+              ${countdownHtml}
               <div class="event-info">${item.division}</div>
             </div>
           </div>
