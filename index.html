@@ -233,18 +233,19 @@
       padding: 4px 8px;
       border-radius: 6px;
     }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v21</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v22</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
   <div class="panel" id="disclaimerPanel">
     <label class="auth-label">
-      <!-- HARD-WIRED TOGGLE: Unlocks screen instantly regardless of JavaScript errors -->
+      <!-- HARD-WIRED TOGGLE: Unlocks screen instantly -->
       <input type="checkbox" id="authCheck" class="auth-checkbox" onchange="document.getElementById('appContainer').style.display = this.checked ? 'block' : 'none';" />
       I confirm that I am a parent, guardian, or member of the Northbridge Knockouts.
     </label>
@@ -252,7 +253,7 @@
 
   <div id="appContainer" style="display: none;">
     
-    <div id="liveBanner" class="live-banner" style="display: none;">
+    <div id="liveBanner" class="live-banner hidden">
       <span><span id="liveLabel">🔥 LIVE: Heat</span> <span id="currentHeatNum">...</span></span>
       <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn" id="updateBtn">
         Update
@@ -264,10 +265,12 @@
       <div style="font-size: 1.15rem; font-weight: 800; margin-top: 6px;" id="scheduleStatusText">Waiting for live data...</div>
     </div>
 
-    <div class="panel file-drop" id="uploadPanel" style="display: none;">
-      <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
-      <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Convert the PDF to CSV and select it here.</p>
-      <input type="file" id="csvFileInput" accept=".csv" />
+    <div class="panel hidden" id="uploadPanel">
+      <div class="file-drop">
+        <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
+        <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Network stalled. Select your converted CSV file here:</p>
+        <input type="file" id="csvFileInput" accept=".csv" />
+      </div>
     </div>
 
     <div id="searchSection">
@@ -286,13 +289,6 @@
     </div>
   </div>
 
-  <!-- INSTANT AUTO-UNLOCK IF BROWSER AUTO-FILLS CHECKBOX -->
-  <script>
-      if (document.getElementById('authCheck').checked) {
-          document.getElementById('appContainer').style.display = 'block';
-      }
-  </script>
-
   <script>
     // -----------------------------------------------------------
     // 1. Global Variables & Memory Tracker
@@ -300,7 +296,7 @@
     let parsedSheet = [];
     let currentLiveHeat = null; 
     let localLastHeat = null;
-    let localHeatTime = new Date().getTime();
+    let localHeatTime = Date.now();
 
     const TOURNAMENT_DATES = {
       "Sunday": "2026/09/27",
@@ -351,9 +347,7 @@
         
         document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
         document.getElementById('scheduleStatusText').innerHTML = statusHtml;
-      } catch (err) {
-        console.error("Time calculation failed silently.");
-      }
+      } catch (err) {}
     }
     setInterval(updateTimeAndStatus, 15000);
 
@@ -366,11 +360,10 @@
         .then(csvText => {
           const heatNumRaw = csvText.split('\n')[0].split(',')[0].trim();
           
-          // Replaced .includes with .indexOf to prevent Android Webview crash
-          if(heatNumRaw && !isNaN(heatNumRaw) && heatNumRaw.indexOf('<html') === -1 && heatNumRaw.toUpperCase().indexOf('<!DOCTYPE') === -1) {
+          if(heatNumRaw && !isNaN(heatNumRaw) && heatNumRaw.indexOf('<html') === -1) {
              const heatNum = parseInt(heatNumRaw, 10);
              
-             const now = new Date().getTime();
+             const now = Date.now();
              if (heatNum !== localLastHeat) {
                  localLastHeat = heatNum;
                  localHeatTime = now;
@@ -396,15 +389,15 @@
              }
 
              currentLiveHeat = heatNum;
-             if (banner) banner.style.display = 'flex';
+             if (banner) banner.classList.remove('hidden');
              if (heatDisp) heatDisp.innerText = heatNum;
              
              updateTimeAndStatus();
-             if (typeof executeSearch === "function") executeSearch(); 
+             executeSearch(); 
           } else {
              currentLiveHeat = null;
              const banner = document.getElementById('liveBanner');
-             if (banner) banner.style.display = 'none';
+             if (banner) banner.classList.add('hidden');
              updateTimeAndStatus();
           }
         })
@@ -414,37 +407,52 @@
         });
     }
     setInterval(fetchLiveHeat, 30000); 
+    fetchLiveHeat();
 
     // -----------------------------------------------------------
-    // 3. Data Parsing Engines
+    // 3. Robust Data Parsing with Fallback Timer
     // -----------------------------------------------------------
     function loadCSVData() {
         if (typeof Papa === 'undefined') {
-            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load. Check connection.</span>`;
+            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load.</span>`;
+            document.getElementById('uploadPanel').classList.remove('hidden');
             return;
         }
 
-        const csvUrl = "heats.csv?v=" + new Date().getTime();
+        // Absolute URL to prevent mobile path resolution failures
+        const csvUrl = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + "heats.csv?v=" + new Date().getTime();
+        
+        let loadFailed = false;
+        const safetyTimer = setTimeout(function() {
+            loadFailed = true;
+            document.getElementById('uploadPanel').classList.remove('hidden');
+            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ Network stalled. Upload CSV manually below:</span>`;
+        }, 4000);
+
         Papa.parse(csvUrl, {
           download: true,
           complete: function(parsed) {
-            // Replaced .includes with .indexOf
+            if (loadFailed) return;
+            clearTimeout(safetyTimer);
+
             if (parsed.data && parsed.data.length > 0 && String(parsed.data[0][0]).toUpperCase().indexOf("<!DOCTYPE") === -1) {
                 parsedSheet = parsed.data;
                 document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
                 executeSearch();
             } else {
-                document.getElementById('uploadPanel').style.display = 'block';
+                document.getElementById('uploadPanel').classList.remove('hidden');
                 document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
-                document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
             }
           },
           error: function() {
-            document.getElementById('uploadPanel').style.display = 'block';
-            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
+            if (loadFailed) return;
+            clearTimeout(safetyTimer);
+            document.getElementById('uploadPanel').classList.remove('hidden');
+            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ Network blocked heats.csv. Upload manually:</span>`;
           }
         });
     }
+    setTimeout(loadCSVData, 100);
 
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
@@ -454,8 +462,8 @@
           Papa.parse(targetFile, {
             complete: function(parsed) {
               parsedSheet = parsed.data;
-              document.getElementById('uploadPanel').style.display = 'none';
-              document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
+              document.getElementById('uploadPanel').classList.add('hidden');
+              document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
               executeSearch();
             }
           });
@@ -522,12 +530,4 @@
       if (tally) tally.innerHTML = '';
 
       if (!parsedSheet || parsedSheet.length === 0) {
-          if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
-          return;
-      }
-
-      const matches = [];
-      let currentHeat = "Unknown";
-      let lastKnownEvents = {}; 
-
-      parsedSheet.forEach((
+          if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8
