@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- CACHE BUSTING TAGS -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -233,20 +232,19 @@
       padding: 4px 8px;
       border-radius: 6px;
     }
-    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v18</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v19</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
   <div class="panel" id="disclaimerPanel">
     <label class="auth-label">
-      <!-- HARD-WIRED TOGGLE: Unlocks screen instantly -->
-      <input type="checkbox" id="authCheck" class="auth-checkbox" onchange="document.getElementById('appContainer').style.display = this.checked ? 'block' : 'none'; if(typeof updateTimeAndStatus === 'function') updateTimeAndStatus();" />
+      <!-- HARD-WIRED TOGGLE -->
+      <input type="checkbox" id="authCheck" class="auth-checkbox" onchange="document.getElementById('appContainer').style.display = this.checked ? 'block' : 'none'; if(typeof window.updateTimeAndStatus === 'function') window.updateTimeAndStatus();" />
       I confirm that I am a parent, guardian, or member of the Northbridge Knockouts.
     </label>
   </div>
@@ -280,7 +278,7 @@
           id="nameQuery"
           class="search-input"
           placeholder="Type athlete name (e.g. Claire, Nate)..."
-          oninput="executeSearch()"
+          oninput="window.executeSearch()"
         />
         <div id="dbStatusIndicator" class="db-status">⏳ Fetching schedule database...</div>
         <div id="tallyDisplay"></div>
@@ -291,14 +289,14 @@
 
   <script>
     // ==========================================
-    // 1. GLOBALS & MEMORY TRACKERS
+    // 1. ES5 BULLETPROOF GLOBALS (No let/const)
     // ==========================================
-    let parsedSheet = [];
-    let currentLiveHeat = null; 
-    let lastHeatSeen = null;
-    let heatFetchTime = new Date().getTime();
+    window.parsedSheet = [];
+    window.currentLiveHeat = null; 
+    window.lastHeatSeen = null;
+    window.heatFetchTime = new Date().getTime();
 
-    const TOURNAMENT_DATES = {
+    var TOURNAMENT_DATES = {
       "Sunday": "2026/09/27",
       "Monday": "2026/09/28",
       "Tuesday": "2026/09/29",
@@ -309,8 +307,8 @@
     // ==========================================
     // 2. HELPER FUNCTIONS
     // ==========================================
-    function getScheduleDetails(heatNum) {
-      const h = parseInt(heatNum, 10);
+    window.getScheduleDetails = function(heatNum) {
+      var h = parseInt(heatNum, 10);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
 
       if (h >= 1 && h <= 67) {
@@ -345,188 +343,159 @@
         return { day: "Thursday", time: "09:00 - 14:30", block: "Grand Champs", blockName: "Overall Championships" };
       }
       return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
-    }
+    };
 
-    function updateTimeAndStatus() {
+    window.getSimpleTimeString = function() {
+      var now = new Date();
+      var hours = now.getHours();
+      var minutes = now.getMinutes();
+      var ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; 
+      minutes = minutes < 10 ? '0' + minutes : minutes;
+      return hours + ':' + minutes + ' ' + ampm;
+    };
+
+    window.updateTimeAndStatus = function() {
       try {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        let statusHtml = '<span style="color: #64748b;">Live tracker offline or waiting...</span>';
+        var now = new Date();
+        var timeString = window.getSimpleTimeString();
+        var statusHtml = '<span style="color: #64748b;">Live tracker offline or waiting...</span>';
         
-        if (currentLiveHeat !== null) {
-          const schedule = getScheduleDetails(currentLiveHeat);
+        if (window.currentLiveHeat !== null) {
+          var schedule = window.getScheduleDetails(window.currentLiveHeat);
           if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
-            const dateStr = TOURNAMENT_DATES[schedule.day]; 
-            const times = schedule.time.split(" - ");
+            var dateStr = TOURNAMENT_DATES[schedule.day]; 
+            var times = schedule.time.split(" - ");
             if (times.length === 2) {
-              const startTime = new Date(`${dateStr} ${times[0]}:00`);
-              const endTime = new Date(`${dateStr} ${times[1]}:00`);
-              
-              if (!isNaN(startTime) && !isNaN(endTime)) {
-                const diffStartMins = Math.floor((now - startTime) / 60000);
-                const diffEndMins = Math.floor((now - endTime) / 60000);
-                
-                if (now >= startTime && now <= endTime) {
-                  statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
-                } else if (now < startTime) {
-                  statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
-                } else if (now > endTime) {
-                  statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
+              var startTime = new Date(dateStr + " " + times[0] + ":00");
+              var endTime = new Date(dateStr + " " + times[1] + ":00");
+              if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
+                var diffStartMins = Math.floor((now.getTime() - startTime.getTime()) / 60000);
+                var diffEndMins = Math.floor((now.getTime() - endTime.getTime()) / 60000);
+                if (now.getTime() >= startTime.getTime() && now.getTime() <= endTime.getTime()) {
+                  statusHtml = '<span style="color: #16a34a;">🟢 On Schedule (' + schedule.time + ')</span>';
+                } else if (now.getTime() < startTime.getTime()) {
+                  statusHtml = '<span style="color: #2563eb;">🔵 Running ' + Math.abs(diffStartMins) + ' mins early</span>';
+                } else if (now.getTime() > endTime.getTime()) {
+                  statusHtml = '<span style="color: #dc2626;">🔴 Running ' + diffEndMins + ' mins late</span>';
                 }
               }
             }
           } else {
-              statusHtml = `<span style="color: #64748b;">Schedule info TBD for Heat ${currentLiveHeat}</span>`;
+              statusHtml = '<span style="color: #64748b;">Schedule info TBD for Heat ' + window.currentLiveHeat + '</span>';
           }
         }
         
-        const timeDisplay = document.getElementById('currentTimeDisplay');
-        const statusText = document.getElementById('scheduleStatusText');
-        if (timeDisplay) timeDisplay.innerText = `Current Time: ${timeString}`;
+        var timeDisplay = document.getElementById('currentTimeDisplay');
+        var statusText = document.getElementById('scheduleStatusText');
+        if (timeDisplay) timeDisplay.innerText = "Current Time: " + timeString;
         if (statusText) statusText.innerHTML = statusHtml;
       } catch (err) {}
-    }
+    };
 
     // ==========================================
-    // 3. V8 FETCH ENGINE + SAFE IN-MEMORY TRACKER
+    // 3. SAFE NETWORK DATA FETCHING (No fetch() API)
     // ==========================================
-    function fetchLiveHeat() {
-      const cacheBuster = new Date().getTime();
-      const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=${cacheBuster}`; 
-      
-      fetch(sheetCsvUrl, { cache: "no-store" })
-        .then(response => response.text())
-        .then(csvText => {
-          const heatNum = csvText.split('\n')[0].split(',')[0].trim();
-          
-          if(heatNum && !isNaN(heatNum)) {
-             // In-Memory Staleness Tracker (No LocalStorage)
-             const now = new Date().getTime();
-             if (heatNum !== lastHeatSeen) {
-                 lastHeatSeen = heatNum;
-                 heatFetchTime = now;
-             }
-             const minsElapsed = Math.floor((now - heatFetchTime) / 60000);
+    window.fetchLiveHeat = function() {
+      try {
+        var sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=" + new Date().getTime(); 
+        
+        Papa.parse(sheetCsvUrl, {
+            download: true,
+            complete: function(parsed) {
+                try {
+                    if (parsed.data && parsed.data.length > 0 && parsed.data[0] && parsed.data[0][0]) {
+                        var heatNumRaw = String(parsed.data[0][0]).trim().toLowerCase();
+                        
+                        if (heatNumRaw.indexOf("<!doctype") === -1 && heatNumRaw.indexOf("<html") === -1) {
+                            var heatNum = heatNumRaw.replace(/[^0-9]/g, '');
+                            
+                            if (heatNum && !isNaN(parseInt(heatNum, 10))) {
+                               var timestamp = new Date().getTime();
+                               
+                               if (heatNum !== window.lastHeatSeen) {
+                                   window.lastHeatSeen = heatNum;
+                                   window.heatFetchTime = timestamp;
+                               }
+                               var minsElapsed = Math.floor((timestamp - window.heatFetchTime) / 60000);
 
-             const banner = document.getElementById('liveBanner');
-             const heatDisp = document.getElementById('currentHeatNum');
-             const liveLabel = document.getElementById('liveLabel');
-             const updateBtn = document.getElementById('updateBtn');
+                               var banner = document.getElementById('liveBanner');
+                               var heatDisp = document.getElementById('currentHeatNum');
+                               var liveLabel = document.getElementById('liveLabel');
+                               var updateBtn = document.getElementById('updateBtn');
 
-             if (banner && liveLabel && updateBtn) {
-                 if (minsElapsed >= 20) {
-                     banner.style.background = '#64748b'; 
-                     liveLabel.innerText = '⏳ Stale Data: Heat';
-                     updateBtn.classList.add('pulse-btn');
-                 } else {
-                     banner.style.background = '#ef4444'; 
-                     let timeText = minsElapsed === 0 ? 'Just now' : `${minsElapsed}m ago`;
-                     liveLabel.innerText = `🔥 LIVE (${timeText}): Heat`;
-                     updateBtn.classList.remove('pulse-btn');
-                 }
-             }
+                               if (banner && liveLabel && updateBtn) {
+                                   if (minsElapsed >= 20) {
+                                       banner.style.background = '#64748b'; 
+                                       liveLabel.innerText = '⏳ Stale Data: Heat';
+                                       updateBtn.className = 'update-btn pulse-btn';
+                                   } else {
+                                       banner.style.background = '#ef4444'; 
+                                       var timeText = minsElapsed === 0 ? 'Just now' : minsElapsed + 'm ago';
+                                       liveLabel.innerText = '🔥 LIVE (' + timeText + '): Heat';
+                                       updateBtn.className = 'update-btn';
+                                   }
+                               }
 
-             currentLiveHeat = parseInt(heatNum, 10);
-             if (banner) banner.style.display = 'flex';
-             if (heatDisp) heatDisp.innerText = heatNum;
-             
-             updateTimeAndStatus();
-             if (typeof executeSearch === "function") executeSearch(); 
-          } else {
-             currentLiveHeat = null;
-             const banner = document.getElementById('liveBanner');
-             if (banner) banner.style.display = 'none';
-             updateTimeAndStatus();
-          }
-        })
-        .catch(err => {
-            currentLiveHeat = null;
-            updateTimeAndStatus();
+                               window.currentLiveHeat = parseInt(heatNum, 10);
+                               if (banner) banner.style.display = 'flex';
+                               if (heatDisp) heatDisp.innerText = heatNum;
+                               window.updateTimeAndStatus();
+                               if (typeof window.executeSearch === 'function') window.executeSearch(); 
+                               return;
+                            }
+                        }
+                    }
+                    
+                    window.currentLiveHeat = null;
+                    var bannerFail = document.getElementById('liveBanner');
+                    if (bannerFail) bannerFail.style.display = 'none';
+                    window.updateTimeAndStatus();
+                    
+                } catch(e) {}
+            },
+            error: function() {}
         });
-    }
+      } catch (e) {}
+    };
 
-    function loadCSVData() {
+    window.showUploadPanel = function(errorMsg) {
+        var upPanel = document.getElementById('uploadPanel');
+        var dbInd = document.getElementById('dbStatusIndicator');
+        var upMsg = document.getElementById('uploadMessage');
+        if (upPanel) upPanel.style.display = 'block';
+        if (dbInd) dbInd.innerHTML = '<span style="color:#ef4444;">⚠️ ' + (errorMsg || 'Database error.') + '</span>';
+        if (upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>Could not fetch heats.csv automatically.</span><br>Upload manually below:";
+    };
+
+    window.loadCSVData = function() {
         if (typeof Papa === 'undefined') {
-            const dbInd = document.getElementById('dbStatusIndicator');
-            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load. Check connection.</span>`;
+            window.showUploadPanel("Parser failed to load.");
             return;
         }
-
-        const csvUrl = "heats.csv?v=" + new Date().getTime();
+        
+        var csvUrl = "heats.csv?v=" + new Date().getTime();
+        
         Papa.parse(csvUrl, {
-          download: true,
-          complete: function(parsed) {
-            if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
-                parsedSheet = parsed.data;
-                const dbInd = document.getElementById('dbStatusIndicator');
-                if(dbInd) dbInd.innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
-                executeSearch();
-            } else {
-                const upPanel = document.getElementById('uploadPanel');
-                const dbInd = document.getElementById('dbStatusIndicator');
-                const upMsg = document.getElementById('uploadMessage');
-                if(upPanel) upPanel.style.display = 'block';
-                if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
-                if(upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
-            }
-          },
-          error: function() {
-            const upPanel = document.getElementById('uploadPanel');
-            const dbInd = document.getElementById('dbStatusIndicator');
-            if(upPanel) upPanel.style.display = 'block';
-            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
-          }
-        });
-    }
-
-    function executeSearch() {
-      const qInput = document.getElementById('nameQuery');
-      if (!qInput) return;
-      
-      const term = qInput.value.trim().toLowerCase();
-      const feed = document.getElementById('resultsFeed');
-      const tally = document.getElementById('tallyDisplay');
-      
-      if (term.length < 2) {
-          if (feed) feed.innerHTML = '';
-          if (tally) tally.innerHTML = '';
-          return;
-      }
-
-      if (feed) feed.innerHTML = '';
-      if (tally) tally.innerHTML = '';
-
-      if (!parsedSheet || parsedSheet.length === 0) {
-          if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
-          return;
-      }
-
-      const matches = [];
-      let currentHeat = "Unknown";
-      let lastKnownEvents = {}; 
-
-      parsedSheet.forEach((row, rIdx) => {
-        let firstCol = (row[0] || "").trim();
-        if (firstCol && !isNaN(firstCol)) {
-          currentHeat = firstCol;
-        } else if (firstCol.toLowerCase().includes("heat") && firstCol.length < 10) {
-          currentHeat = firstCol.replace(/[^0-9]/g, '');
-        }
-
-        row.forEach((cellText, cIdx) => {
-          let text = (cellText || "").trim();
-          if (!text) return;
-
-          if (text.match(/^(SR|DD|WH|IR|Team|DDC|SCT)/i)) {
-            lastKnownEvents[cIdx] = text;
-          }
-
-          let chunks = text.split(/(?=\b\d{1,3}\s+#\d{1,4}\b)/);
-
-          chunks.forEach(chunk => {
-            let chunkText = chunk.trim();
-            if (chunkText.toLowerCase().includes(term)) {
-              if (!chunkText.match(/^(SR|DD|WH|IR|Station|Heat|#)$/i)) {
-                
-                let displayHeat = currentHeat;
-                let displa
+            download: true,
+            complete: function(parsed) {
+                try {
+                    if (parsed.data && parsed.data.length > 0 && parsed.data[0] && parsed.data[0][0]) {
+                        var firstCell = String(parsed.data[0][0]).toLowerCase();
+                        if (firstCell.indexOf("<!doctype") === -1 && firstCell.indexOf("<html") === -1) {
+                            window.parsedSheet = parsed.data;
+                            var dbInd = document.getElementById('dbStatusIndicator');
+                            if (dbInd) dbInd.innerHTML = "✅ Successfully loaded " + window.parsedSheet.length + " rows of data.";
+                            if (typeof window.executeSearch === 'function') window.executeSearch();
+                        } else {
+                            window.showUploadPanel("heats.csv file missing or broken.");
+                        }
+                    } else {
+                        window.showUploadPanel("heats.csv file is empty.");
+                    }
+                } catch(e) {
+                    window.showUploadPanel("Error parsing database.");
+                }
+            },
+        
