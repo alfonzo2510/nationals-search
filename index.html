@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CACHE BUSTING TAGS -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  
   <title>Nationals Heat & Schedule Search</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
@@ -29,6 +34,13 @@
       font-weight: 800;
       letter-spacing: 0.5px;
     }
+    .version-tag {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      font-weight: 500;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
     header p {
       font-size: 0.95rem;
       color: #93c5fd;
@@ -54,8 +66,8 @@
       line-height: 1.4;
     }
     .auth-checkbox {
-      width: 20px;
-      height: 20px;
+      width: 24px;
+      height: 24px;
       cursor: pointer;
       flex-shrink: 0;
       accent-color: #f97316;
@@ -66,7 +78,7 @@
       padding: 12px 16px;
       font-weight: 800;
       border-radius: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       font-size: 1.1rem;
       box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
       display: flex; 
@@ -87,6 +99,11 @@
     }
     .update-btn:active {
       opacity: 0.8;
+    }
+    .status-banner {
+      text-align: center;
+      padding: 14px 16px;
+      margin-bottom: 16px;
     }
     .file-drop {
       border: 2px dashed #cbd5e1;
@@ -114,6 +131,13 @@
       border-color: #f97316;
       background: #ffffff;
       box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+    }
+    .db-status {
+      font-size: 0.8rem;
+      color: #64748b;
+      text-align: center;
+      margin-top: 10px;
+      font-weight: 600;
     }
     .tally-badge {
       display: inline-block;
@@ -205,7 +229,7 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup</h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v4</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
@@ -218,11 +242,18 @@
 
   <div id="appContainer" class="hidden">
     
+    <!-- Live Heat Banner -->
     <div id="liveBanner" class="live-banner hidden">
       <span>🔥 LIVE: Heat <span id="currentHeatNum">...</span></span>
       <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn">
         Update
       </a>
+    </div>
+
+    <!-- Live Timing/Schedule Status Tracker -->
+    <div id="statusBanner" class="panel status-banner">
+      <div style="font-size: 0.9rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;" id="currentTimeDisplay">--:--</div>
+      <div style="font-size: 1.15rem; font-weight: 800; margin-top: 6px;" id="scheduleStatusText">Waiting for live data...</div>
     </div>
 
     <div class="panel hidden" id="uploadPanel">
@@ -233,7 +264,7 @@
       </div>
     </div>
 
-    <div id="searchSection" class="hidden">
+    <div id="searchSection">
       <div class="panel" style="padding: 16px;">
         <input
           type="search"
@@ -242,6 +273,7 @@
           placeholder="Type athlete name (e.g. Claire, Nate)..."
           oninput="executeSearch()"
         />
+        <div id="dbStatusIndicator" class="db-status">⏳ Fetching schedule database...</div>
         <div id="tallyDisplay"></div>
       </div>
       <div id="resultsFeed"></div>
@@ -252,58 +284,122 @@
     let parsedSheet = [];
     let currentLiveHeat = null; 
 
+    const TOURNAMENT_DATES = {
+      "Sunday": "2026/09/27",
+      "Monday": "2026/09/28",
+      "Tuesday": "2026/09/29",
+      "Wednesday": "2026/09/30",
+      "Thursday": "2026/10/01"
+    };
+
+    // Master Unlocking Logic
     document.getElementById('authCheck').addEventListener('change', function(e) {
       const appContainer = document.getElementById('appContainer');
       if (e.target.checked) {
         appContainer.classList.remove('hidden');
-        if (document.getElementById('nameQuery')) {
-          document.getElementById('nameQuery').focus();
-        }
+        document.getElementById('nameQuery').focus();
+        updateTimeAndStatus();
       } else {
         appContainer.classList.add('hidden');
       }
     });
 
+    // Time and Status Engine
+    function updateTimeAndStatus() {
+      try {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        let statusHtml = '<span style="color: #64748b;">Live tracker offline or waiting...</span>';
+        
+        if (currentLiveHeat !== null) {
+          const schedule = getScheduleDetails(currentLiveHeat);
+          
+          if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
+            const dateStr = TOURNAMENT_DATES[schedule.day]; 
+            const times = schedule.time.split(" - ");
+            
+            if (times.length === 2) {
+              const startTime = new Date(`${dateStr} ${times[0]}:00`);
+              const endTime = new Date(`${dateStr} ${times[1]}:00`);
+              
+              if (!isNaN(startTime) && !isNaN(endTime)) {
+                const diffStartMins = Math.floor((now - startTime) / 60000);
+                const diffEndMins = Math.floor((now - endTime) / 60000);
+                
+                if (now >= startTime && now <= endTime) {
+                  statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
+                } else if (now < startTime) {
+                  statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
+                } else if (now > endTime) {
+                  statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
+                }
+              }
+            }
+          } else {
+              statusHtml = `<span style="color: #64748b;">Schedule info TBD for Heat ${currentLiveHeat}</span>`;
+          }
+        }
+        
+        document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
+        document.getElementById('scheduleStatusText').innerHTML = statusHtml;
+      } catch (err) {
+        console.error("Time calculation failed silently.");
+      }
+    }
+    setInterval(updateTimeAndStatus, 15000);
+
+    // Live Flowscore Fetch Engine
     function fetchLiveHeat() {
-      const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv"; 
+      // Bypasses cache by adding a random number to the URL request
+      const cacheBuster = new Date().getTime();
+      const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=${cacheBuster}`; 
       
-      fetch(sheetCsvUrl)
+      fetch(sheetCsvUrl, { cache: "no-store" })
         .then(response => response.text())
         .then(csvText => {
           const heatNum = csvText.split('\n')[0].split(',')[0].trim();
-          
           if(heatNum && !isNaN(heatNum)) {
              currentLiveHeat = parseInt(heatNum, 10);
              document.getElementById('liveBanner').classList.remove('hidden');
              document.getElementById('currentHeatNum').innerText = heatNum;
+             updateTimeAndStatus();
              executeSearch(); 
           } else {
              currentLiveHeat = null;
              document.getElementById('liveBanner').classList.add('hidden');
+             updateTimeAndStatus();
           }
         })
         .catch(err => {
-            console.log("Live feed offline");
             currentLiveHeat = null;
+            updateTimeAndStatus();
         });
     }
     setInterval(fetchLiveHeat, 30000); 
     fetchLiveHeat();
 
-    window.onload = function() {
-      Papa.parse("heats.csv", {
-        download: true,
-        complete: function(parsed) {
-          parsedSheet = parsed.data;
-          document.getElementById('searchSection').classList.remove('hidden');
-        },
-        error: function() {
-          document.getElementById('uploadPanel').classList.remove('hidden');
-          document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv not found in repository.</span><br>Upload it manually below:";
+    // CSV Database Fetch Engine (with cache-busting timestamp)
+    const csvUrl = "heats.csv?v=" + new Date().getTime();
+    Papa.parse(csvUrl, {
+      download: true,
+      complete: function(parsed) {
+        if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
+            parsedSheet = parsed.data;
+            document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
+        } else {
+            document.getElementById('uploadPanel').classList.remove('hidden');
+            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
+            document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
         }
-      });
-    };
+      },
+      error: function() {
+        document.getElementById('uploadPanel').classList.remove('hidden');
+        document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
+      }
+    });
 
+    // Manual Upload Fallback
     document.getElementById('csvFileInput').addEventListener('change', function(e) {
       const targetFile = e.target.files[0];
       if (!targetFile) return;
@@ -312,12 +408,13 @@
         complete: function(parsed) {
           parsedSheet = parsed.data;
           document.getElementById('uploadPanel').classList.add('hidden');
-          document.getElementById('searchSection').classList.remove('hidden');
+          document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
           document.getElementById('nameQuery').focus();
         }
       });
     });
 
+    // Schedule Dictionary
     function getScheduleDetails(heatNum) {
       const h = parseInt(heatNum);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
@@ -357,6 +454,7 @@
       return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
     }
 
+    // Main Search Driver
     function executeSearch() {
       const term = document.getElementById('nameQuery').value.trim().toLowerCase();
       const feed = document.getElementById('resultsFeed');
@@ -370,6 +468,11 @@
 
       feed.innerHTML = '';
       tally.innerHTML = '';
+
+      if (!parsedSheet || parsedSheet.length === 0) {
+          feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
+          return;
+      }
 
       const matches = [];
       let currentHeat = "Unknown";
@@ -442,47 +545,4 @@
       const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
       tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
 
-      if (uniqueMatches.length === 0) {
-        feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">No entries matching that name.</p>';
-        return;
-      }
-
-      uniqueMatches.forEach(item => {
-        let countdownHtml = '';
-        
-        if (currentLiveHeat !== null) {
-          let hNum = parseInt(item.heat, 10);
-          if (!isNaN(hNum)) {
-            let heatsAway = hNum - currentLiveHeat;
-            
-            if (heatsAway === 0) {
-              countdownHtml = `<div class="countdown-badge urgent">🔥 HAPPENING NOW</div><br>`;
-            } else if (heatsAway > 0 && heatsAway <= 15) {
-              countdownHtml = `<div class="countdown-badge warning">🚨 Up Next: In ${heatsAway} Heat${heatsAway > 1 ? 's' : ''}</div><br>`;
-            }
-          }
-        }
-
-        feed.innerHTML += `
-          <div class="card">
-            <div class="card-header">
-              <div class="block-info">
-                <span class="block-time">${item.day} @ ${item.time}</span>
-                <span>${item.block} | ${item.blockName}</span>
-              </div>
-              <div class="heat-station-badge">
-                H${item.heat} | ${item.station.replace('Station ', 'S')}
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="athlete-name">${item.name}</div>
-              ${countdownHtml}
-              <div class="event-info">${item.division}</div>
-            </div>
-          </div>
-        `;
-      });
-    }
-  </script>
-</body>
-</html>
+  
