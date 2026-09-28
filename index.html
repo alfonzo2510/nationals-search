@@ -3,10 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  
   <title>Nationals Heat & Schedule Search</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
@@ -237,13 +233,12 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v12</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v13</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
   <div class="panel" id="disclaimerPanel">
     <label class="auth-label">
-      <!-- HARD-WIRED TOGGLE: Unlocks screen instantly -->
       <input type="checkbox" id="authCheck" class="auth-checkbox" onchange="document.getElementById('appContainer').style.display = this.checked ? 'block' : 'none'; if(typeof window.updateTimeAndStatus === 'function') window.updateTimeAndStatus();" />
       I confirm that I am a parent, guardian, or member of the Northbridge Knockouts.
     </label>
@@ -287,7 +282,7 @@
 
   <script>
     // ==========================================
-    // GLOBAL ARCHITECTURE (V12)
+    // 1. GLOBALS
     // ==========================================
     window.parsedSheet = [];
     window.currentLiveHeat = null; 
@@ -300,6 +295,9 @@
       "Thursday": "2026/10/01"
     };
 
+    // ==========================================
+    // 2. HELPER FUNCTIONS
+    // ==========================================
     window.getScheduleDetails = function(heatNum) {
       const h = parseInt(heatNum);
       if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
@@ -387,104 +385,122 @@
       } catch (err) {}
     };
 
-    window.fetchLiveHeat = function() {
+    // ==========================================
+    // 3. BULLETPROOF NETWORK DATA FETCHING
+    // ==========================================
+    window.fetchLiveHeat = async function() {
       try {
-        const cacheBuster = new Date().getTime();
-        const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=${cacheBuster}`; 
+        // Completely stripped out custom fetch headers that Android Chrome rejects
+        const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&t=${new Date().getTime()}`; 
         
-        fetch(sheetCsvUrl)
-          .then(response => response.text())
-          .then(csvText => {
-            const heatNum = csvText.split('\n')[0].split(',')[0].trim();
-            if(heatNum && !isNaN(heatNum)) {
-               let timestamp = new Date().getTime();
-               let minsElapsed = 0;
-               try {
-                   let lastHeat = localStorage.getItem('nk_last_heat');
-                   let storedTime = localStorage.getItem('nk_heat_timestamp');
-                   if (lastHeat !== heatNum || !storedTime) {
-                       localStorage.setItem('nk_last_heat', heatNum);
-                       localStorage.setItem('nk_heat_timestamp', timestamp);
-                   } else {
-                       timestamp = parseInt(storedTime, 10);
-                   }
-                   minsElapsed = Math.floor((new Date().getTime() - timestamp) / 60000);
-               } catch (e) {}
+        const response = await fetch(sheetCsvUrl);
+        if (!response.ok) throw new Error("Google Sheets fetch failed");
+        const csvText = await response.text();
 
-               const banner = document.getElementById('liveBanner');
-               const heatDisp = document.getElementById('currentHeatNum');
-               const liveLabel = document.getElementById('liveLabel');
-               const updateBtn = document.getElementById('updateBtn');
+        // Safety check to ensure we didn't receive an HTML login page
+        if (csvText.toLowerCase().includes('<!doctype') || csvText.toLowerCase().includes('<html')) {
+            throw new Error("Received HTML instead of CSV");
+        }
 
-               if (banner && liveLabel && updateBtn) {
-                   if (minsElapsed >= 20) {
-                       banner.style.background = '#64748b'; 
-                       liveLabel.innerText = '⏳ Stale Data: Heat';
-                       updateBtn.classList.add('pulse-btn');
-                   } else {
-                       banner.style.background = '#ef4444'; 
-                       let timeText = minsElapsed === 0 ? 'Just now' : `${minsElapsed}m ago`;
-                       liveLabel.innerText = `🔥 LIVE (${timeText}): Heat`;
-                       updateBtn.classList.remove('pulse-btn');
-                   }
+        const heatNum = csvText.split('\n')[0].split(',')[0].trim();
+        
+        if (heatNum && !isNaN(heatNum)) {
+           let timestamp = new Date().getTime();
+           let minsElapsed = 0;
+           try {
+               let lastHeat = localStorage.getItem('nk_last_heat');
+               let storedTime = localStorage.getItem('nk_heat_timestamp');
+               if (lastHeat !== heatNum || !storedTime) {
+                   localStorage.setItem('nk_last_heat', heatNum);
+                   localStorage.setItem('nk_heat_timestamp', timestamp);
+               } else {
+                   timestamp = parseInt(storedTime, 10);
                }
+               minsElapsed = Math.floor((new Date().getTime() - timestamp) / 60000);
+           } catch (e) {}
 
-               window.currentLiveHeat = parseInt(heatNum, 10);
-               if (banner) banner.style.display = 'flex';
-               if (heatDisp) heatDisp.innerText = heatNum;
-               window.updateTimeAndStatus();
-               window.executeSearch(); 
-            } else {
-               window.currentLiveHeat = null;
-               const banner = document.getElementById('liveBanner');
-               if (banner) banner.style.display = 'none';
-               window.updateTimeAndStatus();
-            }
-          })
-          .catch(err => {
-              window.currentLiveHeat = null;
-              window.updateTimeAndStatus();
-          });
-      } catch (e) {}
+           const banner = document.getElementById('liveBanner');
+           const heatDisp = document.getElementById('currentHeatNum');
+           const liveLabel = document.getElementById('liveLabel');
+           const updateBtn = document.getElementById('updateBtn');
+
+           if (banner && liveLabel && updateBtn) {
+               if (minsElapsed >= 20) {
+                   banner.style.background = '#64748b'; 
+                   liveLabel.innerText = '⏳ Stale Data: Heat';
+                   updateBtn.classList.add('pulse-btn');
+               } else {
+                   banner.style.background = '#ef4444'; 
+                   let timeText = minsElapsed === 0 ? 'Just now' : `${minsElapsed}m ago`;
+                   liveLabel.innerText = `🔥 LIVE (${timeText}): Heat`;
+                   updateBtn.classList.remove('pulse-btn');
+               }
+           }
+
+           window.currentLiveHeat = parseInt(heatNum, 10);
+           if (banner) banner.style.display = 'flex';
+           if (heatDisp) heatDisp.innerText = heatNum;
+           window.updateTimeAndStatus();
+           window.executeSearch(); 
+        } else {
+           window.currentLiveHeat = null;
+           const banner = document.getElementById('liveBanner');
+           if (banner) banner.style.display = 'none';
+           window.updateTimeAndStatus();
+        }
+      } catch (err) {
+          window.currentLiveHeat = null;
+          window.updateTimeAndStatus();
+      }
     };
 
-    window.showUploadPanel = function() {
+    window.showUploadPanel = function(errorMsg) {
         const upPanel = document.getElementById('uploadPanel');
         const dbInd = document.getElementById('dbStatusIndicator');
         const upMsg = document.getElementById('uploadMessage');
-        if(upPanel) upPanel.style.display = 'block';
-        if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
-        if(upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload manually below:";
+        if (upPanel) upPanel.style.display = 'block';
+        if (dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ ${errorMsg || 'Database error.'}</span>`;
+        if (upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>Could not fetch heats.csv automatically.</span><br>Upload manually below:";
     };
 
-    window.loadCSVData = function() {
+    window.loadCSVData = async function() {
       try {
         if (typeof Papa === 'undefined') {
-            const dbInd = document.getElementById('dbStatusIndicator');
-            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load.</span>`;
+            window.showUploadPanel("Parser failed to load.");
             return;
         }
         
-        const csvUrl = "heats.csv?v=" + new Date().getTime();
+        // Manual robust fetch instead of Papa's internal downloader to bypass strict CORS caching checks
+        const csvUrl = `heats.csv?t=${new Date().getTime()}`;
+        const response = await fetch(csvUrl);
         
-        Papa.parse(csvUrl, {
-          download: true,
+        if (!response.ok) {
+            window.showUploadPanel("heats.csv not found on server.");
+            return;
+        }
+        
+        const csvText = await response.text();
+        
+        // Safety check to ensure we didn't receive a 404 HTML page from GitHub
+        if (csvText.toLowerCase().includes('<!doctype') || csvText.toLowerCase().includes('<html')) {
+            window.showUploadPanel("heats.csv is missing.");
+            return;
+        }
+
+        Papa.parse(csvText, {
           complete: function(parsed) {
-            if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
+            if (parsed.data && parsed.data.length > 0) {
                 window.parsedSheet = parsed.data;
                 const dbInd = document.getElementById('dbStatusIndicator');
                 if(dbInd) dbInd.innerHTML = `✅ Successfully loaded ${window.parsedSheet.length} rows of data.`;
                 window.executeSearch();
             } else {
-                window.showUploadPanel();
+                window.showUploadPanel("CSV appears to be empty.");
             }
-          },
-          error: function() {
-              window.showUploadPanel();
           }
         });
       } catch (e) {
-         window.showUploadPanel();
+         window.showUploadPanel("Network block preventing download.");
       }
     };
 
@@ -515,19 +531,4 @@
         let currentHeat = "Unknown";
         let lastKnownEvents = {}; 
 
-        window.parsedSheet.forEach((row, rIdx) => {
-          let firstCol = (row[0] || "").trim();
-          if (firstCol && !isNaN(firstCol)) {
-            currentHeat = firstCol;
-          } else if (firstCol.toLowerCase().includes("heat") && firstCol.length < 10) {
-            currentHeat = firstCol.replace(/[^0-9]/g, '');
-          }
-
-          row.forEach((cellText, cIdx) => {
-            let text = (cellText || "").trim();
-            if (!text) return;
-            if (text.match(/^(SR|DD|WH|IR|Team|DDC|SCT)/i)) {
-              lastKnownEvents[cIdx] = text;
-            }
-
-            let chunks = text.split(/(?=\b\d{1
+        window.p
