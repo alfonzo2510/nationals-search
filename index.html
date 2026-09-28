@@ -229,7 +229,7 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v5</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v6</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
@@ -282,28 +282,7 @@
 
   <script>
     // -----------------------------------------------------------
-    // 1. Core Interface Logic (Executes Immediately)
-    // -----------------------------------------------------------
-    const authCheck = document.getElementById('authCheck');
-    const appContainer = document.getElementById('appContainer');
-
-    function syncUI() {
-      if (authCheck.checked) {
-        appContainer.classList.remove('hidden');
-        if (typeof updateTimeAndStatus === "function") updateTimeAndStatus();
-      } else {
-        appContainer.classList.add('hidden');
-      }
-    }
-
-    // Listens for manual taps
-    authCheck.addEventListener('change', syncUI);
-    // Forces the UI to open immediately if the browser auto-filled the checkmark
-    syncUI(); 
-
-
-    // -----------------------------------------------------------
-    // 2. Global Variables & Dictionaries
+    // 1. Global Variables & Dictionaries (Initialized First)
     // -----------------------------------------------------------
     let parsedSheet = [];
     let currentLiveHeat = null; 
@@ -315,6 +294,30 @@
       "Wednesday": "2026/09/30",
       "Thursday": "2026/10/01"
     };
+
+    // -----------------------------------------------------------
+    // 2. Core Interface Logic
+    // -----------------------------------------------------------
+    const authCheck = document.getElementById('authCheck');
+    const appContainer = document.getElementById('appContainer');
+    const nameQuery = document.getElementById('nameQuery');
+
+    function syncUI() {
+      if (authCheck && appContainer) {
+        if (authCheck.checked) {
+          appContainer.classList.remove('hidden');
+          if (nameQuery) nameQuery.focus();
+          if (typeof updateTimeAndStatus === "function") updateTimeAndStatus();
+        } else {
+          appContainer.classList.add('hidden');
+        }
+      }
+    }
+
+    if (authCheck) {
+      authCheck.addEventListener('change', syncUI);
+      syncUI(); 
+    }
 
     // -----------------------------------------------------------
     // 3. Status and Live Tracking Engines
@@ -355,8 +358,10 @@
           }
         }
         
-        document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
-        document.getElementById('scheduleStatusText').innerHTML = statusHtml;
+        const timeDisplay = document.getElementById('currentTimeDisplay');
+        const statusText = document.getElementById('scheduleStatusText');
+        if (timeDisplay) timeDisplay.innerText = `Current Time: ${timeString}`;
+        if (statusText) statusText.innerHTML = statusHtml;
       } catch (err) {
         console.error("Time calculation failed silently.");
       }
@@ -373,13 +378,16 @@
           const heatNum = csvText.split('\n')[0].split(',')[0].trim();
           if(heatNum && !isNaN(heatNum)) {
              currentLiveHeat = parseInt(heatNum, 10);
-             document.getElementById('liveBanner').classList.remove('hidden');
-             document.getElementById('currentHeatNum').innerText = heatNum;
+             const banner = document.getElementById('liveBanner');
+             const heatDisp = document.getElementById('currentHeatNum');
+             if (banner) banner.classList.remove('hidden');
+             if (heatDisp) heatDisp.innerText = heatNum;
              updateTimeAndStatus();
              executeSearch(); 
           } else {
              currentLiveHeat = null;
-             document.getElementById('liveBanner').classList.add('hidden');
+             const banner = document.getElementById('liveBanner');
+             if (banner) banner.classList.add('hidden');
              updateTimeAndStatus();
           }
         })
@@ -396,7 +404,8 @@
     // -----------------------------------------------------------
     function loadCSVData() {
         if (typeof Papa === 'undefined') {
-            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load. Check connection.</span>`;
+            const dbInd = document.getElementById('dbStatusIndicator');
+            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load. Check connection.</span>`;
             return;
         }
 
@@ -406,37 +415,47 @@
           complete: function(parsed) {
             if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
                 parsedSheet = parsed.data;
-                document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
+                const dbInd = document.getElementById('dbStatusIndicator');
+                if(dbInd) dbInd.innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
             } else {
-                document.getElementById('uploadPanel').classList.remove('hidden');
-                document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
-                document.getElementById('uploadMessage').innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
+                const upPanel = document.getElementById('uploadPanel');
+                const dbInd = document.getElementById('dbStatusIndicator');
+                const upMsg = document.getElementById('uploadMessage');
+                if(upPanel) upPanel.classList.remove('hidden');
+                if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
+                if(upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload it manually below:";
             }
           },
           error: function() {
-            document.getElementById('uploadPanel').classList.remove('hidden');
-            document.getElementById('dbStatusIndicator').innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
+            const upPanel = document.getElementById('uploadPanel');
+            const dbInd = document.getElementById('dbStatusIndicator');
+            if(upPanel) upPanel.classList.remove('hidden');
+            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
           }
         });
     }
-    
-    // Attempt loading CSV shortly after page execution
-    setTimeout(loadCSVData, 500);
+    setTimeout(loadCSVData, 200);
 
-    document.getElementById('csvFileInput').addEventListener('change', function(e) {
-      const targetFile = e.target.files[0];
-      if (!targetFile) return;
+    const csvFileIn = document.getElementById('csvFileInput');
+    if (csvFileIn) {
+        csvFileIn.addEventListener('change', function(e) {
+          const targetFile = e.target.files[0];
+          if (!targetFile) return;
 
-      if (typeof Papa !== 'undefined') {
-          Papa.parse(targetFile, {
-            complete: function(parsed) {
-              parsedSheet = parsed.data;
-              document.getElementById('uploadPanel').classList.add('hidden');
-              document.getElementById('dbStatusIndicator').innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
-            }
-          });
-      }
-    });
+          if (typeof Papa !== 'undefined') {
+              Papa.parse(targetFile, {
+                complete: function(parsed) {
+                  parsedSheet = parsed.data;
+                  const upPanel = document.getElementById('uploadPanel');
+                  const dbInd = document.getElementById('dbStatusIndicator');
+                  if (upPanel) upPanel.classList.add('hidden');
+                  if (dbInd) dbInd.innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
+                  executeSearch();
+                }
+              });
+          }
+        });
+    }
 
     // -----------------------------------------------------------
     // 5. Schedule Mapping & Search Logic
@@ -481,21 +500,24 @@
     }
 
     function executeSearch() {
-      const term = document.getElementById('nameQuery').value.trim().toLowerCase();
+      const qInput = document.getElementById('nameQuery');
+      if (!qInput) return;
+      
+      const term = qInput.value.trim().toLowerCase();
       const feed = document.getElementById('resultsFeed');
       const tally = document.getElementById('tallyDisplay');
       
       if (term.length < 2) {
-          feed.innerHTML = '';
-          tally.innerHTML = '';
+          if (feed) feed.innerHTML = '';
+          if (tally) tally.innerHTML = '';
           return;
       }
 
-      feed.innerHTML = '';
-      tally.innerHTML = '';
+      if (feed) feed.innerHTML = '';
+      if (tally) tally.innerHTML = '';
 
       if (!parsedSheet || parsedSheet.length === 0) {
-          feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
+          if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
           return;
       }
 
@@ -521,24 +543,4 @@
 
           let chunks = text.split(/(?=\b\d{1,3}\s+#\d{1,4}\b)/);
 
-          chunks.forEach(chunk => {
-            let chunkText = chunk.trim();
-            if (chunkText.toLowerCase().includes(term)) {
-              if (!chunkText.match(/^(SR|DD|WH|IR|Station|Heat|#)$/i)) {
-                
-                let displayHeat = currentHeat;
-                let displayDiv = lastKnownEvents[cIdx] || "Division parsing error";
-                let displayName = chunkText;
-
-                let embeddedHeatMatch = chunkText.match(/^(\d{1,3})\s+#\d{1,4}/);
-                if (embeddedHeatMatch) {
-                   displayHeat = embeddedHeatMatch[1];
-                   displayName = chunkText.replace(/^\d{1,3}\s+#\d{1,4}\s+/, '');
-                   
-                   let divMatch = displayName.match(/^(SR|DD|WH|IR|Team|DDC|SCT)[A-Za-z0-9\-\s\+]{2,15}/i);
-                   if (divMatch) {
-                       displayDiv = divMatch[0].trim();
-                       displayName = displayName.replace(divMatch[0], '').trim();
-                   }
-                }
-                
+          chunks.forEach(ch
