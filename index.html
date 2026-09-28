@@ -229,10 +229,8 @@
 
     // Google Sheets Live Heat Fetcher
     function fetchLiveHeat() {
-      const sheetCsvUrl = "YOUR_PUBLISHED_CSV_LINK_HERE"; 
+      const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv"; 
       
-      if (sheetCsvUrl === "YOUR_PUBLISHED_CSV_LINK_HERE") return; // Do nothing if placeholder is active
-
       fetch(sheetCsvUrl)
         .then(response => response.text())
         .then(csvText => {
