@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- CACHE BUSTING TAGS -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -229,7 +230,7 @@
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v7</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v8</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
@@ -278,228 +279,342 @@
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        try {
-            let parsedSheet = [];
-            let currentLiveHeat = null; 
+    // ==========================================
+    // 1. GLOBALS
+    // ==========================================
+    window.parsedSheet = [];
+    window.currentLiveHeat = null; 
 
-            const TOURNAMENT_DATES = {
-              "Sunday": "2026/09/27",
-              "Monday": "2026/09/28",
-              "Tuesday": "2026/09/29",
-              "Wednesday": "2026/09/30",
-              "Thursday": "2026/10/01"
-            };
+    const TOURNAMENT_DATES = {
+      "Sunday": "2026/09/27",
+      "Monday": "2026/09/28",
+      "Tuesday": "2026/09/29",
+      "Wednesday": "2026/09/30",
+      "Thursday": "2026/10/01"
+    };
 
-            const authCheck = document.getElementById('authCheck');
-            const appContainer = document.getElementById('appContainer');
-            const nameQuery = document.getElementById('nameQuery');
+    // ==========================================
+    // 2. HELPER FUNCTIONS
+    // ==========================================
+    function getScheduleDetails(heatNum) {
+      const h = parseInt(heatNum);
+      if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
 
-            function syncUI() {
-              if (authCheck && appContainer) {
-                if (authCheck.checked) {
-                  appContainer.classList.remove('hidden');
-                  if (nameQuery) nameQuery.focus();
-                  updateTimeAndStatus();
-                } else {
-                  appContainer.classList.add('hidden');
+      if (h >= 1 && h <= 67) {
+        if (h <= 28) return { day: "Sunday", time: "09:45 - 11:20", block: "Heats 1-28", blockName: "SRSE (11+), SRSS (7U-10)" };
+        if (h <= 53) return { day: "Sunday", time: "11:50 - 13:20", block: "Heats 31-53", blockName: "DDSF (All Ages)" };
+        return { day: "Sunday", time: "14:05 - 14:45", block: "Heats 56-67", blockName: "Individual Freestyle (7U/8)" };
+      }
+      if (h >= 70 && h <= 214) {
+        if (h <= 99) return { day: "Monday", time: "08:00 - 08:45", block: "Heats 70-99", blockName: "SRSS (11+), SRSE 1MIN (7U-10)" };
+        if (h <= 112) return { day: "Monday", time: "08:45 - 09:10", block: "Heats 104-112", blockName: "SRSR (All Ages)" };
+        if (h <= 121) return { day: "Monday", time: "09:20 - 09:40", block: "Heats 115-121", blockName: "DDSS (12+)" };
+        if (h <= 139) return { day: "Monday", time: "10:50 - 11:15", block: "Heats 126-139", blockName: "SRPF (8U/9-10) SRTF (30+)" };
+        if (h <= 189) return { day: "Monday", time: "11:40 - 15:00", block: "Heats 141-189", blockName: "SRIF (11-29F)" };
+        return { day: "Monday", time: "15:10 - 16:40", block: "Heats 191-214", blockName: "SRTF (9-10/11-12/12-15/16+)" };
+      }
+      if (h >= 216 && h <= 331) {
+        if (h <= 228) return { day: "Tuesday", time: "08:30 - 09:00", block: "Heats 216-228", blockName: "SRDR (All Ages)" };
+        if (h <= 236) return { day: "Tuesday", time: "09:10 - 09:25", block: "Heats 230-236", blockName: "DDSR (11+), DDCS (12-15, 16+)" };
+        if (h <= 240) return { day: "Tuesday", time: "09:35 - 09:40", block: "Heats 239-240", blockName: "DDSR 2X30 (8U, 9-10)" };
+        if (h <= 267) return { day: "Tuesday", time: "10:40 - 12:05", block: "Heats 243-267", blockName: "SRIF (9/10/30+)" };
+        if (h <= 284) return { day: "Tuesday", time: "12:15 - 13:20", block: "Heats 269-284", blockName: "SRIF (11+M)" };
+        return { day: "Tuesday", time: "13:35 - 16:20", block: "Heats 286-331", blockName: "SRPF (11+)" };
+      }
+      if (h >= 333 && h <= 382) {
+        if (h <= 336) return { day: "Wednesday", time: "09:00 - 09:20", block: "Heats 333-336", blockName: "SRTU (11-14/15+)" };
+        if (h <= 350) return { day: "Wednesday", time: "09:30 - 10:10", block: "Heats 339-350", blockName: "DDPF (12-15/16+)" };
+        if (h <= 368) return { day: "Wednesday", time: "10:10 - 11:00", block: "Heats 352-368", blockName: "WHPF (12-15/16-18/19+), SRPF (30+)" };
+        if (h <= 379) return { day: "Wednesday", time: "12:30 - 13:40", block: "Heats 374-379", blockName: "Team Show" };
+        return { day: "Wednesday", time: "14:20 - 14:40", block: "Heats 380-382", blockName: "DDC Performance" };
+      }
+      if (h >= 1000) {
+        return { day: "Thursday", time: "09:00 - 14:30", block: "Grand Champs", blockName: "Overall Championships" };
+      }
+      return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
+    }
+
+    function updateTimeAndStatus() {
+      try {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        let statusHtml = '<span style="color: #64748b;">Live tracker offline or waiting...</span>';
+        
+        if (window.currentLiveHeat !== null) {
+          const schedule = getScheduleDetails(window.currentLiveHeat);
+          if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
+            const dateStr = TOURNAMENT_DATES[schedule.day]; 
+            const times = schedule.time.split(" - ");
+            if (times.length === 2) {
+              const startTime = new Date(`${dateStr} ${times[0]}:00`);
+              const endTime = new Date(`${dateStr} ${times[1]}:00`);
+              if (!isNaN(startTime) && !isNaN(endTime)) {
+                const diffStartMins = Math.floor((now - startTime) / 60000);
+                const diffEndMins = Math.floor((now - endTime) / 60000);
+                if (now >= startTime && now <= endTime) {
+                  statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
+                } else if (now < startTime) {
+                  statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
+                } else if (now > endTime) {
+                  statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
                 }
               }
             }
+          } else {
+              statusHtml = `<span style="color: #64748b;">Schedule info TBD for Heat ${window.currentLiveHeat}</span>`;
+          }
+        }
+        
+        const timeDisplay = document.getElementById('currentTimeDisplay');
+        const statusText = document.getElementById('scheduleStatusText');
+        if (timeDisplay) timeDisplay.innerText = `Current Time: ${timeString}`;
+        if (statusText) statusText.innerHTML = statusHtml;
+      } catch (err) {
+        console.error("Time calculation error avoided.");
+      }
+    }
 
-            if (authCheck) {
-              authCheck.addEventListener('change', syncUI);
-              syncUI(); 
+    function fetchLiveHeat() {
+      const cacheBuster = new Date().getTime();
+      const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=${cacheBuster}`; 
+      
+      fetch(sheetCsvUrl, { cache: "no-store" })
+        .then(response => response.text())
+        .then(csvText => {
+          const heatNum = csvText.split('\n')[0].split(',')[0].trim();
+          if(heatNum && !isNaN(heatNum)) {
+             window.currentLiveHeat = parseInt(heatNum, 10);
+             const banner = document.getElementById('liveBanner');
+             const heatDisp = document.getElementById('currentHeatNum');
+             if (banner) banner.classList.remove('hidden');
+             if (heatDisp) heatDisp.innerText = heatNum;
+             updateTimeAndStatus();
+             if (typeof executeSearch === "function") executeSearch(); 
+          } else {
+             window.currentLiveHeat = null;
+             const banner = document.getElementById('liveBanner');
+             if (banner) banner.classList.add('hidden');
+             updateTimeAndStatus();
+          }
+        })
+        .catch(err => {
+            window.currentLiveHeat = null;
+            updateTimeAndStatus();
+        });
+    }
+
+    function loadCSVData() {
+        if (typeof Papa === 'undefined') {
+            const dbInd = document.getElementById('dbStatusIndicator');
+            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load.</span>`;
+            return;
+        }
+        const csvUrl = "heats.csv?v=" + new Date().getTime();
+        Papa.parse(csvUrl, {
+          download: true,
+          complete: function(parsed) {
+            if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
+                window.parsedSheet = parsed.data;
+                const dbInd = document.getElementById('dbStatusIndicator');
+                if(dbInd) dbInd.innerHTML = `✅ Successfully loaded ${window.parsedSheet.length} rows of data.`;
+            } else {
+                const upPanel = document.getElementById('uploadPanel');
+                const dbInd = document.getElementById('dbStatusIndicator');
+                const upMsg = document.getElementById('uploadMessage');
+                if(upPanel) upPanel.classList.remove('hidden');
+                if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
+                if(upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload manually below:";
             }
+          },
+          error: function() {
+            const upPanel = document.getElementById('uploadPanel');
+            const dbInd = document.getElementById('dbStatusIndicator');
+            if(upPanel) upPanel.classList.remove('hidden');
+            if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
+          }
+        });
+    }
 
-            function updateTimeAndStatus() {
-              try {
-                const now = new Date();
-                const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Explicitly binding search to global scope so HTML can definitely call it
+    window.executeSearch = function() {
+      const qInput = document.getElementById('nameQuery');
+      if (!qInput) return;
+      
+      const term = qInput.value.trim().toLowerCase();
+      const feed = document.getElementById('resultsFeed');
+      const tally = document.getElementById('tallyDisplay');
+      
+      if (term.length < 2) {
+          if (feed) feed.innerHTML = '';
+          if (tally) tally.innerHTML = '';
+          return;
+      }
+
+      if (feed) feed.innerHTML = '';
+      if (tally) tally.innerHTML = '';
+
+      if (!window.parsedSheet || window.parsedSheet.length === 0) {
+          if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
+          return;
+      }
+
+      const matches = [];
+      let currentHeat = "Unknown";
+      let lastKnownEvents = {}; 
+
+      window.parsedSheet.forEach((row, rIdx) => {
+        let firstCol = (row[0] || "").trim();
+        if (firstCol && !isNaN(firstCol)) {
+          currentHeat = firstCol;
+        } else if (firstCol.toLowerCase().includes("heat") && firstCol.length < 10) {
+          currentHeat = firstCol.replace(/[^0-9]/g, '');
+        }
+
+        row.forEach((cellText, cIdx) => {
+          let text = (cellText || "").trim();
+          if (!text) return;
+          if (text.match(/^(SR|DD|WH|IR|Team|DDC|SCT)/i)) {
+            lastKnownEvents[cIdx] = text;
+          }
+
+          let chunks = text.split(/(?=\b\d{1,3}\s+#\d{1,4}\b)/);
+          chunks.forEach(chunk => {
+            let chunkText = chunk.trim();
+            if (chunkText.toLowerCase().includes(term)) {
+              if (!chunkText.match(/^(SR|DD|WH|IR|Station|Heat|#)$/i)) {
                 
-                let statusHtml = '<span style="color: #64748b;">Live tracker offline or waiting...</span>';
+                let displayHeat = currentHeat;
+                let displayDiv = lastKnownEvents[cIdx] || "Division parsing error";
+                let displayName = chunkText;
+                let embeddedHeatMatch = chunkText.match(/^(\d{1,3})\s+#\d{1,4}/);
                 
-                if (currentLiveHeat !== null) {
-                  const schedule = getScheduleDetails(currentLiveHeat);
-                  
-                  if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
-                    const dateStr = TOURNAMENT_DATES[schedule.day]; 
-                    const times = schedule.time.split(" - ");
-                    
-                    if (times.length === 2) {
-                      const startTime = new Date(`${dateStr} ${times[0]}:00`);
-                      const endTime = new Date(`${dateStr} ${times[1]}:00`);
-                      
-                      if (!isNaN(startTime) && !isNaN(endTime)) {
-                        const diffStartMins = Math.floor((now - startTime) / 60000);
-                        const diffEndMins = Math.floor((now - endTime) / 60000);
-                        
-                        if (now >= startTime && now <= endTime) {
-                          statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
-                        } else if (now < startTime) {
-                          statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
-                        } else if (now > endTime) {
-                          statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
-                        }
-                      }
-                    }
-                  } else {
-                      statusHtml = `<span style="color: #64748b;">Schedule info TBD for Heat ${currentLiveHeat}</span>`;
-                  }
+                if (embeddedHeatMatch) {
+                   displayHeat = embeddedHeatMatch[1];
+                   displayName = chunkText.replace(/^\d{1,3}\s+#\d{1,4}\s+/, '');
+                   let divMatch = displayName.match(/^(SR|DD|WH|IR|Team|DDC|SCT)[A-Za-z0-9\-\s\+]{2,15}/i);
+                   if (divMatch) {
+                       displayDiv = divMatch[0].trim();
+                       displayName = displayName.replace(divMatch[0], '').trim();
+                   }
                 }
-                
-                const timeDisplay = document.getElementById('currentTimeDisplay');
-                const statusText = document.getElementById('scheduleStatusText');
-                if (timeDisplay) timeDisplay.innerText = `Current Time: ${timeString}`;
-                if (statusText) statusText.innerHTML = statusHtml;
-              } catch (err) {
-                console.error("Time calculation failed:", err);
-              }
-            }
-            setInterval(updateTimeAndStatus, 15000);
 
-            function fetchLiveHeat() {
-              const cacheBuster = new Date().getTime();
-              const sheetCsvUrl = `https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv&_cb=${cacheBuster}`; 
-              
-              fetch(sheetCsvUrl, { cache: "no-store" })
-                .then(response => response.text())
-                .then(csvText => {
-                  const heatNum = csvText.split('\n')[0].split(',')[0].trim();
-                  if(heatNum && !isNaN(heatNum)) {
-                     currentLiveHeat = parseInt(heatNum, 10);
-                     const banner = document.getElementById('liveBanner');
-                     const heatDisp = document.getElementById('currentHeatNum');
-                     if (banner) banner.classList.remove('hidden');
-                     if (heatDisp) heatDisp.innerText = heatNum;
-                     updateTimeAndStatus();
-                     executeSearch(); 
-                  } else {
-                     currentLiveHeat = null;
-                     const banner = document.getElementById('liveBanner');
-                     if (banner) banner.classList.add('hidden');
-                     updateTimeAndStatus();
-                  }
-                })
-                .catch(err => {
-                    currentLiveHeat = null;
-                    updateTimeAndStatus();
-                });
-            }
-            setInterval(fetchLiveHeat, 30000); 
-            fetchLiveHeat();
-
-            function loadCSVData() {
-                if (typeof Papa === 'undefined') {
-                    const dbInd = document.getElementById('dbStatusIndicator');
-                    if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ Parser failed to load.</span>`;
-                    return;
+                if (displayName.length > 45) {
+                    let matchIdx = displayName.toLowerCase().indexOf(term);
+                    let start = Math.max(0, matchIdx - 15);
+                    let end = Math.min(displayName.length, matchIdx + term.length + 15);
+                    displayName = (start > 0 ? "..." : "") + displayName.substring(start, end).trim() + (end < displayName.length ? "..." : "");
                 }
-                const csvUrl = "heats.csv?v=" + new Date().getTime();
-                Papa.parse(csvUrl, {
-                  download: true,
-                  complete: function(parsed) {
-                    if (parsed.data && parsed.data.length > 0 && !String(parsed.data[0][0]).includes("<!DOCTYPE")) {
-                        parsedSheet = parsed.data;
-                        const dbInd = document.getElementById('dbStatusIndicator');
-                        if(dbInd) dbInd.innerHTML = `✅ Successfully loaded ${parsedSheet.length} rows of data.`;
-                    } else {
-                        const upPanel = document.getElementById('uploadPanel');
-                        const dbInd = document.getElementById('dbStatusIndicator');
-                        const upMsg = document.getElementById('uploadMessage');
-                        if(upPanel) upPanel.classList.remove('hidden');
-                        if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
-                        if(upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload manually below:";
-                    }
-                  },
-                  error: function() {
-                    const upPanel = document.getElementById('uploadPanel');
-                    const dbInd = document.getElementById('dbStatusIndicator');
-                    if(upPanel) upPanel.classList.remove('hidden');
-                    if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
-                  }
+
+                const schedule = getScheduleDetails(displayHeat);
+                matches.push({
+                  name: displayName,
+                  heat: displayHeat,
+                  station: cIdx > 0 ? `Station ${cIdx}` : 'Station 1',
+                  division: displayDiv,
+                  day: schedule.day,
+                  time: schedule.time,
+                  block: schedule.block,
+                  blockName: schedule.blockName
                 });
+              }
             }
-            setTimeout(loadCSVData, 200);
+          });
+        });
+      });
 
-            const csvFileIn = document.getElementById('csvFileInput');
-            if (csvFileIn) {
-                csvFileIn.addEventListener('change', function(e) {
-                  const targetFile = e.target.files[0];
-                  if (!targetFile) return;
-                  if (typeof Papa !== 'undefined') {
-                      Papa.parse(targetFile, {
-                        complete: function(parsed) {
-                          parsedSheet = parsed.data;
-                          const upPanel = document.getElementById('uploadPanel');
-                          const dbInd = document.getElementById('dbStatusIndicator');
-                          if (upPanel) upPanel.classList.add('hidden');
-                          if (dbInd) dbInd.innerHTML = `✅ Successfully uploaded ${parsedSheet.length} rows of data.`;
-                          executeSearch();
-                        }
-                      });
-                  }
-                });
+      const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(str => JSON.parse(str));
+      if (tally) tally.innerHTML = `<span class="tally-badge">Total Events Found: ${uniqueMatches.length}</span>`;
+
+      if (uniqueMatches.length === 0) {
+        if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">No entries matching that name.</p>';
+        return;
+      }
+
+      uniqueMatches.forEach(item => {
+        let countdownHtml = '';
+        if (window.currentLiveHeat !== null) {
+          let hNum = parseInt(item.heat, 10);
+          if (!isNaN(hNum)) {
+            let heatsAway = hNum - window.currentLiveHeat;
+            if (heatsAway === 0) {
+              countdownHtml = `<div class="countdown-badge urgent">🔥 HAPPENING NOW</div><br>`;
+            } else if (heatsAway > 0 && heatsAway <= 15) {
+              countdownHtml = `<div class="countdown-badge warning">🚨 Up Next: In ${heatsAway} Heat${heatsAway > 1 ? 's' : ''}</div><br>`;
             }
+          }
+        }
 
-            function getScheduleDetails(heatNum) {
-              const h = parseInt(heatNum);
-              if (isNaN(h)) return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
+        if (feed) feed.innerHTML += `
+          <div class="card">
+            <div class="card-header">
+              <div class="block-info">
+                <span class="block-time">${item.day} @ ${item.time}</span>
+                <span>${item.block} | ${item.blockName}</span>
+              </div>
+              <div class="heat-station-badge">
+                H${item.heat} | ${item.station.replace('Station ', 'S')}
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="athlete-name">${item.name}</div>
+              ${countdownHtml}
+              <div class="event-info">${item.division}</div>
+            </div>
+          </div>
+        `;
+      });
+    };
 
-              if (h >= 1 && h <= 67) {
-                if (h <= 28) return { day: "Sunday", time: "09:45 - 11:20", block: "Heats 1-28", blockName: "SRSE (11+), SRSS (7U-10)" };
-                if (h <= 53) return { day: "Sunday", time: "11:50 - 13:20", block: "Heats 31-53", blockName: "DDSF (All Ages)" };
-                return { day: "Sunday", time: "14:05 - 14:45", block: "Heats 56-67", blockName: "Individual Freestyle (7U/8)" };
-              }
-              if (h >= 70 && h <= 214) {
-                if (h <= 99) return { day: "Monday", time: "08:00 - 08:45", block: "Heats 70-99", blockName: "SRSS (11+), SRSE 1MIN (7U-10)" };
-                if (h <= 112) return { day: "Monday", time: "08:45 - 09:10", block: "Heats 104-112", blockName: "SRSR (All Ages)" };
-                if (h <= 121) return { day: "Monday", time: "09:20 - 09:40", block: "Heats 115-121", blockName: "DDSS (12+)" };
-                if (h <= 139) return { day: "Monday", time: "10:50 - 11:15", block: "Heats 126-139", blockName: "SRPF (8U/9-10) SRTF (30+)" };
-                if (h <= 189) return { day: "Monday", time: "11:40 - 15:00", block: "Heats 141-189", blockName: "SRIF (11-29F)" };
-                return { day: "Monday", time: "15:10 - 16:40", block: "Heats 191-214", blockName: "SRTF (9-10/11-12/12-15/16+)" };
-              }
-              if (h >= 216 && h <= 331) {
-                if (h <= 228) return { day: "Tuesday", time: "08:30 - 09:00", block: "Heats 216-228", blockName: "SRDR (All Ages)" };
-                if (h <= 236) return { day: "Tuesday", time: "09:10 - 09:25", block: "Heats 230-236", blockName: "DDSR (11+), DDCS (12-15, 16+)" };
-                if (h <= 240) return { day: "Tuesday", time: "09:35 - 09:40", block: "Heats 239-240", blockName: "DDSR 2X30 (8U, 9-10)" };
-                if (h <= 267) return { day: "Tuesday", time: "10:40 - 12:05", block: "Heats 243-267", blockName: "SRIF (9/10/30+)" };
-                if (h <= 284) return { day: "Tuesday", time: "12:15 - 13:20", block: "Heats 269-284", blockName: "SRIF (11+M)" };
-                return { day: "Tuesday", time: "13:35 - 16:20", block: "Heats 286-331", blockName: "SRPF (11+)" };
-              }
-              if (h >= 333 && h <= 382) {
-                if (h <= 336) return { day: "Wednesday", time: "09:00 - 09:20", block: "Heats 333-336", blockName: "SRTU (11-14/15+)" };
-                if (h <= 350) return { day: "Wednesday", time: "09:30 - 10:10", block: "Heats 339-350", blockName: "DDPF (12-15/16+)" };
-                if (h <= 368) return { day: "Wednesday", time: "10:10 - 11:00", block: "Heats 352-368", blockName: "WHPF (12-15/16-18/19+), SRPF (30+)" };
-                if (h <= 379) return { day: "Wednesday", time: "12:30 - 13:40", block: "Heats 374-379", blockName: "Team Show" };
-                return { day: "Wednesday", time: "14:20 - 14:40", block: "Heats 380-382", blockName: "DDC Performance" };
-              }
-              if (h >= 1000) {
-                return { day: "Thursday", time: "09:00 - 14:30", block: "Grand Champs", blockName: "Overall Championships" };
-              }
-              return { day: "TBD", time: "Time TBD", block: "Heats TBD", blockName: "Event TBD" };
-            }
+    // ==========================================
+    // 3. UI SYNC LOGIC (Runs Top-Down)
+    // ==========================================
+    const authCheck = document.getElementById('authCheck');
+    const appContainer = document.getElementById('appContainer');
 
-            window.executeSearch = function() {
-              const qInput = document.getElementById('nameQuery');
-              if (!qInput) return;
-              
-              const term = qInput.value.trim().toLowerCase();
-              const feed = document.getElementById('resultsFeed');
-              const tally = document.getElementById('tallyDisplay');
-              
-              if (term.length < 2) {
-                  if (feed) feed.innerHTML = '';
-                  if (tally) tally.innerHTML = '';
-                  return;
-              }
+    function syncUI() {
+      if (authCheck && appContainer) {
+        if (authCheck.checked) {
+          appContainer.classList.remove('hidden');
+          updateTimeAndStatus();
+        } else {
+          appContainer.classList.add('hidden');
+        }
+      }
+    }
 
-              if (feed) feed.innerHTML = '';
-              if (tally) tally.innerHTML = '';
+    if (authCheck) {
+      authCheck.addEventListener('change', syncUI);
+      syncUI(); 
+    }
 
-              if (!parsedSheet || parsedSheet.length === 0) {
-                  if (feed) feed.innerHTML = '<p style="text-align: center; color: #94a3b8; margin-top: 16px;">Waiting for schedule data to load...</p>';
-                  return;
-              }
+    const csvFileIn = document.getElementById('csvFileInput');
+    if (csvFileIn) {
+        csvFileIn.addEventListener('change', function(e) {
+          const targetFile = e.target.files[0];
+          if (!targetFile) return;
+          if (typeof Papa !== 'undefined') {
+              Papa.parse(targetFile, {
+                complete: function(parsed) {
+                  window.parsedSheet = parsed.data;
+                  const upPanel = document.getElementById('uploadPanel');
+                  const dbInd = document.getElementById('dbStatusIndicator');
+                  if (upPanel) upPanel.classList.add('hidden');
+                  if (dbInd) dbInd.innerHTML = `✅ Successfully uploaded ${window.parsedSheet.length} rows of data.`;
+                  if (typeof executeSearch === "function") executeSearch();
+                }
+              });
+          }
+        });
+    }
 
-            
+    // ==========================================
+    // 4. START INTERVALS & DATA FETCH
+    // ==========================================
+    setInterval(updateTimeAndStatus, 15000);
+    setInterval(fetchLiveHeat, 30000); 
+    fetchLiveHeat();
+    setTimeout(loadCSVData, 100);
+
+  </script>
+</body>
+</html>
