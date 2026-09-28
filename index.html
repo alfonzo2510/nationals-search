@@ -66,7 +66,7 @@
       padding: 12px 16px;
       font-weight: 800;
       border-radius: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       font-size: 1.1rem;
       box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
       display: flex; 
@@ -87,6 +87,11 @@
     }
     .update-btn:active {
       opacity: 0.8;
+    }
+    .status-banner {
+      text-align: center;
+      padding: 14px 16px;
+      margin-bottom: 16px;
     }
     .file-drop {
       border: 2px dashed #cbd5e1;
@@ -218,11 +223,18 @@
 
   <div id="appContainer" class="hidden">
     
+    <!-- Live Heat Banner -->
     <div id="liveBanner" class="live-banner hidden">
       <span>🔥 LIVE: Heat <span id="currentHeatNum">...</span></span>
       <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn">
         Update
       </a>
+    </div>
+
+    <!-- Live Timing/Schedule Status Tracker -->
+    <div id="statusBanner" class="panel status-banner hidden">
+      <div style="font-size: 0.9rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;" id="currentTimeDisplay">--:--</div>
+      <div style="font-size: 1.15rem; font-weight: 800; margin-top: 6px;" id="scheduleStatusText">Calculating schedule...</div>
     </div>
 
     <div class="panel hidden" id="uploadPanel">
@@ -252,6 +264,15 @@
     let parsedSheet = [];
     let currentLiveHeat = null; 
 
+    // Hardcoded dates for the 2026 Tournament to calculate late/early offsets
+    const TOURNAMENT_DATES = {
+      "Sunday": "2026-09-27",
+      "Monday": "2026-09-28",
+      "Tuesday": "2026-09-29",
+      "Wednesday": "2026-09-30",
+      "Thursday": "2026-10-01"
+    };
+
     document.getElementById('authCheck').addEventListener('change', function(e) {
       const appContainer = document.getElementById('appContainer');
       if (e.target.checked) {
@@ -259,10 +280,60 @@
         if (document.getElementById('nameQuery')) {
           document.getElementById('nameQuery').focus();
         }
+        updateTimeAndStatus(); // Trigger clock immediately
       } else {
         appContainer.classList.add('hidden');
       }
     });
+
+    // Calculates if the current heat is running ahead, behind, or on schedule
+    function updateTimeAndStatus() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      
+      let statusHtml = "Waiting for live heat data...";
+      
+      if (currentLiveHeat !== null) {
+        const schedule = getScheduleDetails(currentLiveHeat);
+        
+        if (schedule.day !== "TBD" && TOURNAMENT_DATES[schedule.day]) {
+          const dateStr = TOURNAMENT_DATES[schedule.day];
+          const times = schedule.time.split(" - ");
+          
+          if (times.length === 2) {
+            const startStr = `${dateStr}T${times[0]}:00`;
+            const endStr = `${dateStr}T${times[1]}:00`;
+            const startTime = new Date(startStr);
+            const endTime = new Date(endStr);
+            
+            if (!isNaN(startTime) && !isNaN(endTime)) {
+              const diffStartMins = Math.floor((now - startTime) / 60000);
+              const diffEndMins = Math.floor((now - endTime) / 60000);
+              
+              if (now >= startTime && now <= endTime) {
+                statusHtml = `<span style="color: #16a34a;">🟢 On Schedule (${schedule.time})</span>`;
+              } else if (now < startTime) {
+                statusHtml = `<span style="color: #2563eb;">🔵 Running ${Math.abs(diffStartMins)} mins early</span>`;
+              } else if (now > endTime) {
+                statusHtml = `<span style="color: #dc2626;">🔴 Running ${diffEndMins} mins late</span>`;
+              }
+            }
+          }
+        }
+      }
+      
+      const statusContainer = document.getElementById('statusBanner');
+      if (currentLiveHeat !== null) {
+          statusContainer.classList.remove('hidden');
+          document.getElementById('currentTimeDisplay').innerText = `Current Time: ${timeString}`;
+          document.getElementById('scheduleStatusText').innerHTML = statusHtml;
+      } else {
+          statusContainer.classList.add('hidden');
+      }
+    }
+
+    // Ping the clock every 15 seconds
+    setInterval(updateTimeAndStatus, 15000);
 
     function fetchLiveHeat() {
       const sheetCsvUrl = "https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/export?format=csv"; 
@@ -276,17 +347,21 @@
              currentLiveHeat = parseInt(heatNum, 10);
              document.getElementById('liveBanner').classList.remove('hidden');
              document.getElementById('currentHeatNum').innerText = heatNum;
+             updateTimeAndStatus();
              executeSearch(); 
           } else {
              currentLiveHeat = null;
              document.getElementById('liveBanner').classList.add('hidden');
+             updateTimeAndStatus();
           }
         })
         .catch(err => {
             console.log("Live feed offline");
             currentLiveHeat = null;
+            updateTimeAndStatus();
         });
     }
+    // Ping the Google Sheet every 30 seconds
     setInterval(fetchLiveHeat, 30000); 
     fetchLiveHeat();
 
@@ -477,12 +552,4 @@
             <div class="card-body">
               <div class="athlete-name">${item.name}</div>
               ${countdownHtml}
-              <div class="event-info">${item.division}</div>
-            </div>
-          </div>
-        `;
-      });
-    }
-  </script>
-</body>
-</html>
+           
