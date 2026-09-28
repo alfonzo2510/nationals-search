@@ -74,7 +74,7 @@
       accent-color: #f97316;
     }
     .live-banner {
-      background: #ef4444; /* Default Red */
+      background: #ef4444; 
       color: white;
       padding: 12px 16px;
       font-weight: 800;
@@ -82,7 +82,6 @@
       margin-bottom: 12px;
       font-size: 1.1rem;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-      display: flex; 
       justify-content: space-between; 
       align-items: center; 
       text-align: left;
@@ -234,26 +233,26 @@
       padding: 4px 8px;
       border-radius: 6px;
     }
-    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>2026 Nationals Lookup <span class="version-tag">v9</span></h1>
+    <h1>2026 Nationals Lookup <span class="version-tag">v10</span></h1>
     <p>Search athletes across all heats & divisions</p>
   </header>
 
   <div class="panel" id="disclaimerPanel">
     <label class="auth-label">
-      <input type="checkbox" id="authCheck" class="auth-checkbox" />
+      <!-- HARD-WIRED TOGGLE: Unlocks screen instantly even if JS crashes -->
+      <input type="checkbox" id="authCheck" class="auth-checkbox" onchange="document.getElementById('appContainer').style.display = this.checked ? 'block' : 'none'; if(typeof updateTimeAndStatus === 'function') updateTimeAndStatus();" />
       I confirm that I am a parent, guardian, or member of the Northbridge Knockouts.
     </label>
   </div>
 
-  <div id="appContainer" class="hidden">
+  <div id="appContainer" style="display: none;">
     
-    <div id="liveBanner" class="live-banner hidden">
+    <div id="liveBanner" class="live-banner" style="display: none;">
       <span><span id="liveLabel">🔥 LIVE: Heat</span> <span id="currentHeatNum">...</span></span>
       <a href="https://docs.google.com/spreadsheets/d/1jNzHNdjIDklZKVoB7AaWiyO_prlt8zJMX7cU5lybAhc/edit?usp=sharing" target="_blank" class="update-btn" id="updateBtn">
         Update
@@ -265,12 +264,10 @@
       <div style="font-size: 1.15rem; font-weight: 800; margin-top: 6px;" id="scheduleStatusText">Waiting for live data...</div>
     </div>
 
-    <div class="panel hidden" id="uploadPanel">
-      <div class="file-drop">
-        <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
-        <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Convert the PDF to CSV and select it here.</p>
-        <input type="file" id="csvFileInput" accept=".csv" />
-      </div>
+    <div class="panel file-drop" id="uploadPanel" style="display: none;">
+      <strong id="uploadMessage" style="color: #0f172a;">Upload Heats File (.CSV)</strong>
+      <p style="font-size: 0.85rem; color: #64748b; margin-top: 6px;">Convert the PDF to CSV and select it here.</p>
+      <input type="file" id="csvFileInput" accept=".csv" />
     </div>
 
     <div id="searchSection">
@@ -381,7 +378,7 @@
         if (timeDisplay) timeDisplay.innerText = `Current Time: ${timeString}`;
         if (statusText) statusText.innerHTML = statusHtml;
       } catch (err) {
-        console.error("Time calculation error avoided.");
+        console.error("Time logic bypassed");
       }
     }
 
@@ -395,18 +392,24 @@
           const heatNum = csvText.split('\n')[0].split(',')[0].trim();
           if(heatNum && !isNaN(heatNum)) {
              
-             // --- LOCAL MEMORY STALENESS TRACKER ---
-             let lastHeat = localStorage.getItem('nk_last_heat');
-             let timestamp = localStorage.getItem('nk_heat_timestamp');
-             const now = new Date().getTime();
-
-             if (lastHeat !== heatNum || !timestamp) {
-                 localStorage.setItem('nk_last_heat', heatNum);
-                 localStorage.setItem('nk_heat_timestamp', now);
-                 timestamp = now;
+             // --- FAILSAFE MEMORY TRACKER ---
+             let timestamp = new Date().getTime();
+             let minsElapsed = 0;
+             try {
+                 let lastHeat = localStorage.getItem('nk_last_heat');
+                 let storedTime = localStorage.getItem('nk_heat_timestamp');
+                 if (lastHeat !== heatNum || !storedTime) {
+                     localStorage.setItem('nk_last_heat', heatNum);
+                     localStorage.setItem('nk_heat_timestamp', timestamp);
+                 } else {
+                     timestamp = parseInt(storedTime, 10);
+                 }
+                 minsElapsed = Math.floor((new Date().getTime() - timestamp) / 60000);
+             } catch (e) {
+                 // Ignore errors from Safari Private Mode
              }
+             // -------------------------------
 
-             const minsElapsed = Math.floor((now - timestamp) / 60000);
              const banner = document.getElementById('liveBanner');
              const heatDisp = document.getElementById('currentHeatNum');
              const liveLabel = document.getElementById('liveLabel');
@@ -414,29 +417,26 @@
 
              if (banner && liveLabel && updateBtn) {
                  if (minsElapsed >= 20) {
-                     // Stale Data UI
                      banner.style.background = '#64748b'; 
                      liveLabel.innerText = '⏳ Stale Data: Heat';
                      updateBtn.classList.add('pulse-btn');
                  } else {
-                     // Fresh Data UI
                      banner.style.background = '#ef4444'; 
                      let timeText = minsElapsed === 0 ? 'Just now' : `${minsElapsed}m ago`;
                      liveLabel.innerText = `🔥 LIVE (${timeText}): Heat`;
                      updateBtn.classList.remove('pulse-btn');
                  }
              }
-             // ----------------------------------------
 
              window.currentLiveHeat = parseInt(heatNum, 10);
-             if (banner) banner.classList.remove('hidden');
+             if (banner) banner.style.display = 'flex';
              if (heatDisp) heatDisp.innerText = heatNum;
              updateTimeAndStatus();
              if (typeof executeSearch === "function") executeSearch(); 
           } else {
              window.currentLiveHeat = null;
              const banner = document.getElementById('liveBanner');
-             if (banner) banner.classList.add('hidden');
+             if (banner) banner.style.display = 'none';
              updateTimeAndStatus();
           }
         })
@@ -464,7 +464,7 @@
                 const upPanel = document.getElementById('uploadPanel');
                 const dbInd = document.getElementById('dbStatusIndicator');
                 const upMsg = document.getElementById('uploadMessage');
-                if(upPanel) upPanel.classList.remove('hidden');
+                if(upPanel) upPanel.style.display = 'block';
                 if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv not found on server.</span>`;
                 if(upMsg) upMsg.innerHTML = "<span style='color:#ef4444;'>heats.csv missing.</span><br>Upload manually below:";
             }
@@ -472,13 +472,12 @@
           error: function() {
             const upPanel = document.getElementById('uploadPanel');
             const dbInd = document.getElementById('dbStatusIndicator');
-            if(upPanel) upPanel.classList.remove('hidden');
+            if(upPanel) upPanel.style.display = 'block';
             if(dbInd) dbInd.innerHTML = `<span style="color:#ef4444;">⚠️ heats.csv error.</span>`;
           }
         });
     }
 
-    // Explicitly binding search to global scope so HTML can definitely call it
     window.executeSearch = function() {
       const qInput = document.getElementById('nameQuery');
       if (!qInput) return;
@@ -523,8 +522,4 @@
           let chunks = text.split(/(?=\b\d{1,3}\s+#\d{1,4}\b)/);
           chunks.forEach(chunk => {
             let chunkText = chunk.trim();
-            if (chunkText.toLowerCase().includes(term)) {
-              if (!chunkText.match(/^(SR|DD|WH|IR|Station|Heat|#)$/i)) {
-                
-                let displayHeat = currentHeat;
-                let displayDiv = lastKnow
+        
