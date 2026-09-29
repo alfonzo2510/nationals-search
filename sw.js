@@ -1,0 +1,35 @@
+// Service worker: offline support + notification clicks.
+// Network first (so updates arrive when online), saved copy when offline.
+const CACHE = 'nationals-v1';
+const CORE = ['index.html', 'heats.csv', 'manifest.json'];
+
+self.addEventListener('install', function (e) {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).catch(function () {}));
+});
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+  }).then(function () { return self.clients.claim(); }));
+});
+self.addEventListener('fetch', function (e) {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;          // live sheet etc. are never cached
+  const key = url.origin + url.pathname;                     // ignore ?v=cache-busters
+  e.respondWith(
+    fetch(url.href, { cache: 'no-store' }).then(function (res) {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(key, copy); }); }
+      return res;
+    }).catch(function () {
+      return caches.match(key).then(function (r) { return r || caches.match('index.html'); });
+    })
+  );
+});
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window' }).then(function (list) {
+    return list.length ? list[0].focus() : self.clients.openWindow('./');
+  }));
+});
