@@ -1,8 +1,0 @@
-{
-  "name": "Nationals Lookup",
-  "short_name": "Nationals",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#f0f4f8",
-  "theme_color": "#0f172a"
-}
